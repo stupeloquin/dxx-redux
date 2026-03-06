@@ -14,6 +14,10 @@
 #include <CoreServices/CoreServices.h>
 #include <ApplicationServices/ApplicationServices.h>
 #endif
+#ifdef __ANDROID__
+#include <SDL.h>
+#include <android/log.h>
+#endif
 
 #include "physfsx.h"
 #include "args.h"
@@ -25,10 +29,10 @@
 // The user directory is searched first.
 void PHYSFSX_init(int argc, char *argv[])
 {
-#if defined(__unix__) || defined(__APPLE__) || defined(__MACH__)
+#if (defined(__unix__) && !defined(__ANDROID__)) || defined(__APPLE__) || defined(__MACH__)
 	char fullPath[PATH_MAX + 5];
 #endif
-#if defined(__unix__)
+#if defined(__unix__) && !defined(__ANDROID__)
 	char *path = NULL;
 	char *appimage;
 #endif
@@ -40,8 +44,21 @@ void PHYSFSX_init(int argc, char *argv[])
 	PHYSFS_init(argv[0]);
 	PHYSFS_permitSymbolicLinks(1);
 	base_dir = strdup(PHYSFS_getBaseDir());
-	
-#ifdef __unix__
+
+#ifdef __ANDROID__
+	{
+		// On Android, use SDL's external storage path for save data and game files.
+		// Game data (.hog, .pig) should be placed in /sdcard/dxx-redux/data/
+		const char *ext_path = SDL_AndroidGetExternalStoragePath();
+		if (ext_path) {
+			PHYSFS_setWriteDir(ext_path);
+			PHYSFS_addToSearchPath(ext_path, 1);
+			__android_log_print(ANDROID_LOG_INFO, "DXX", "PhysFS write dir: %s", ext_path);
+		}
+		// Also search /sdcard/dxx-redux/ for user-placed game data
+		PHYSFS_addToSearchPath("/sdcard/dxx-redux", 1);
+	}
+#elif defined(__unix__)
 	if ((appimage = getenv("APPIMAGE")))
 	{
 		char *p;
@@ -69,7 +86,7 @@ void PHYSFSX_init(int argc, char *argv[])
 	chdir(base_dir);	// make sure relative hogdir paths work
 #endif
 	
-#if defined(__unix__)
+#if defined(__unix__) && !defined(__ANDROID__)
 # if !(defined(__APPLE__) && defined(__MACH__))
 	path = "~/.d2x-redux/";
 # else
@@ -136,7 +153,7 @@ void PHYSFSX_init(int argc, char *argv[])
 	//tell PHYSFS where hogdir is
 	if (GameArg.SysHogDir)
 		PHYSFS_addToSearchPath(GameArg.SysHogDir,1);
-#if defined(__unix__)
+#if defined(__unix__) && !defined(__ANDROID__)
 	else if (!GameArg.SysNoHogDir)
 		PHYSFS_addToSearchPath(SHAREPATH, 1);
 #endif

@@ -1,0 +1,344 @@
+cmake_minimum_required(VERSION 3.28)
+project(dxx-redux-android C CXX)
+
+# DXX_GAME is passed from build.gradle: "d1x" or "d2x"
+if(NOT DXX_GAME)
+    set(DXX_GAME "d1x")
+endif()
+
+if(DXX_GAME STREQUAL "d2x")
+    set(DXX_SRCDIR "d2")
+else()
+    set(DXX_SRCDIR "d1")
+endif()
+
+# Root of the dxx-redux source tree
+set(DXX_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../../../../dxx-redux/${DXX_SRCDIR}")
+
+# --------------------------------------------------------------------------
+# Build SDL2 from source
+# --------------------------------------------------------------------------
+set(SDL2_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../SDL")
+add_subdirectory(${SDL2_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/SDL2-build)
+
+# --------------------------------------------------------------------------
+# Build SDL2_mixer from source
+# --------------------------------------------------------------------------
+set(SDL2_MIXER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../SDL2_mixer")
+set(SDL2_DIR "${CMAKE_CURRENT_BINARY_DIR}/SDL2-build")
+set(SDL2_INCLUDE_DIR "${SDL2_SOURCE_DIR}/include")
+
+set(SDL2MIXER_OPUS OFF CACHE BOOL "" FORCE)
+set(SDL2MIXER_FLAC OFF CACHE BOOL "" FORCE)
+set(SDL2MIXER_MOD OFF CACHE BOOL "" FORCE)
+set(SDL2MIXER_MIDI OFF CACHE BOOL "" FORCE)
+set(SDL2MIXER_WAVPACK OFF CACHE BOOL "" FORCE)
+set(SDL2MIXER_MP3 OFF CACHE BOOL "" FORCE)
+set(SDL2MIXER_OGG OFF CACHE BOOL "" FORCE)
+set(SDL2MIXER_SAMPLES OFF CACHE BOOL "" FORCE)
+set(SDL2MIXER_INSTALL OFF CACHE BOOL "" FORCE)
+
+add_subdirectory(${SDL2_MIXER_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/SDL2_mixer-build)
+
+# --------------------------------------------------------------------------
+# PhysFS (pre-built static library)
+# --------------------------------------------------------------------------
+set(PHYSFS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../physfs-install")
+add_library(physfs STATIC IMPORTED)
+set_target_properties(physfs PROPERTIES
+    IMPORTED_LOCATION "${PHYSFS_ROOT}/lib/libphysfs.a"
+)
+set(PHYSFS_INCLUDE_DIR "${PHYSFS_ROOT}/include")
+
+# --------------------------------------------------------------------------
+# Source files: 2d library
+# --------------------------------------------------------------------------
+set(SRC_2D
+    ${DXX_SRC}/2d/2dsline.c
+    ${DXX_SRC}/2d/bitblt.c
+    ${DXX_SRC}/2d/bitmap.c
+    ${DXX_SRC}/2d/box.c
+    ${DXX_SRC}/2d/canvas.c
+    ${DXX_SRC}/2d/circle.c
+    ${DXX_SRC}/2d/disc.c
+    ${DXX_SRC}/2d/font.c
+    ${DXX_SRC}/2d/gpixel.c
+    ${DXX_SRC}/2d/line.c
+    ${DXX_SRC}/2d/palette.c
+    ${DXX_SRC}/2d/pcx.c
+    ${DXX_SRC}/2d/pixel.c
+    ${DXX_SRC}/2d/rect.c
+    ${DXX_SRC}/2d/rle.c
+    ${DXX_SRC}/2d/scalec.c
+)
+
+# --------------------------------------------------------------------------
+# Source files: 3d library
+# --------------------------------------------------------------------------
+set(SRC_3D
+    ${DXX_SRC}/3d/clipper.c
+    ${DXX_SRC}/3d/draw.c
+    ${DXX_SRC}/3d/globvars.c
+    ${DXX_SRC}/3d/instance.c
+    ${DXX_SRC}/3d/interp.c
+    ${DXX_SRC}/3d/matrix.c
+    ${DXX_SRC}/3d/points.c
+    ${DXX_SRC}/3d/rod.c
+    ${DXX_SRC}/3d/setup.c
+)
+
+# --------------------------------------------------------------------------
+# Source files: iff library
+# --------------------------------------------------------------------------
+set(SRC_IFF
+    ${DXX_SRC}/iff/iff.c
+)
+
+# --------------------------------------------------------------------------
+# Source files: maths library
+# --------------------------------------------------------------------------
+set(SRC_MATHS
+    ${DXX_SRC}/maths/fixc.c
+    ${DXX_SRC}/maths/rand.c
+    ${DXX_SRC}/maths/tables.c
+    ${DXX_SRC}/maths/vecmat.c
+)
+
+# --------------------------------------------------------------------------
+# Source files: mem library
+# --------------------------------------------------------------------------
+set(SRC_MEM
+    ${DXX_SRC}/mem/mem.c
+)
+
+# --------------------------------------------------------------------------
+# Source files: misc library
+# --------------------------------------------------------------------------
+set(SRC_MISC
+    ${DXX_SRC}/misc/args.c
+    ${DXX_SRC}/misc/error.c
+    ${DXX_SRC}/misc/hash.c
+    ${DXX_SRC}/misc/hmp.c
+    ${DXX_SRC}/misc/ignorecase.c
+    ${DXX_SRC}/misc/physfsx.c
+    ${DXX_SRC}/misc/strio.c
+    ${DXX_SRC}/misc/strutil.c
+)
+
+# --------------------------------------------------------------------------
+# Source files: texmap library
+# --------------------------------------------------------------------------
+set(SRC_TEXMAP
+    ${DXX_SRC}/texmap/ntmap.c
+    ${DXX_SRC}/texmap/scanline.c
+)
+
+# --------------------------------------------------------------------------
+# Source files: arch/ogl (OpenGL ES renderer)
+# --------------------------------------------------------------------------
+set(SRC_ARCH_OGL
+    ${DXX_SRC}/arch/ogl/gr.c
+    ${DXX_SRC}/arch/ogl/ogl.c
+)
+
+# --------------------------------------------------------------------------
+# Source files: arch/sdl (SDL2 platform layer)
+# --------------------------------------------------------------------------
+set(SRC_ARCH_SDL
+    ${DXX_SRC}/arch/sdl/event.c
+    ${DXX_SRC}/arch/sdl/init.c
+    ${DXX_SRC}/arch/sdl/joy.c
+    ${DXX_SRC}/arch/sdl/key.c
+    ${DXX_SRC}/arch/sdl/mouse.c
+    ${DXX_SRC}/arch/sdl/rbaudio.c
+    ${DXX_SRC}/arch/sdl/timer.c
+    ${DXX_SRC}/arch/sdl/window.c
+    ${DXX_SRC}/arch/sdl/digi.c
+    ${DXX_SRC}/arch/sdl/digi_audio.c
+    ${DXX_SRC}/arch/sdl/digi_mixer.c
+    ${DXX_SRC}/arch/sdl/digi_mixer_music.c
+    ${DXX_SRC}/arch/sdl/jukebox.c
+)
+
+# --------------------------------------------------------------------------
+# Source files: main game (common to both d1 and d2)
+# --------------------------------------------------------------------------
+set(SRC_MAIN
+    ${DXX_SRC}/main/ai.c
+    ${DXX_SRC}/main/aipath.c
+    ${DXX_SRC}/main/automap.c
+    ${DXX_SRC}/main/bm.c
+    ${DXX_SRC}/main/cntrlcen.c
+    ${DXX_SRC}/main/collide.c
+    ${DXX_SRC}/main/config.c
+    ${DXX_SRC}/main/console.c
+    ${DXX_SRC}/main/controls.c
+    ${DXX_SRC}/main/credits.c
+    ${DXX_SRC}/main/digiobj.c
+    ${DXX_SRC}/main/dumpmine.c
+    ${DXX_SRC}/main/effects.c
+    ${DXX_SRC}/main/endlevel.c
+    ${DXX_SRC}/main/fireball.c
+    ${DXX_SRC}/main/fuelcen.c
+    ${DXX_SRC}/main/fvi.c
+    ${DXX_SRC}/main/game.c
+    ${DXX_SRC}/main/gamecntl.c
+    ${DXX_SRC}/main/gamefont.c
+    ${DXX_SRC}/main/gamemine.c
+    ${DXX_SRC}/main/gamerend.c
+    ${DXX_SRC}/main/gamesave.c
+    ${DXX_SRC}/main/gameseg.c
+    ${DXX_SRC}/main/gameseq.c
+    ${DXX_SRC}/main/gauges.c
+    ${DXX_SRC}/main/hostage.c
+    ${DXX_SRC}/main/hud.c
+    ${DXX_SRC}/main/inferno.c
+    ${DXX_SRC}/main/kconfig.c
+    ${DXX_SRC}/main/kmatrix.c
+    ${DXX_SRC}/main/laser.c
+    ${DXX_SRC}/main/lighting.c
+    ${DXX_SRC}/main/menu.c
+    ${DXX_SRC}/main/mglobal.c
+    ${DXX_SRC}/main/mission.c
+    ${DXX_SRC}/main/morph.c
+    ${DXX_SRC}/main/multi.c
+    ${DXX_SRC}/main/multibot.c
+    ${DXX_SRC}/main/net_udp.c
+    ${DXX_SRC}/main/newdemo.c
+    ${DXX_SRC}/main/newmenu.c
+    ${DXX_SRC}/main/object.c
+    ${DXX_SRC}/main/paging.c
+    ${DXX_SRC}/main/physics.c
+    ${DXX_SRC}/main/piggy.c
+    ${DXX_SRC}/main/player.c
+    ${DXX_SRC}/main/playsave.c
+    ${DXX_SRC}/main/polyobj.c
+    ${DXX_SRC}/main/powerup.c
+    ${DXX_SRC}/main/render.c
+    ${DXX_SRC}/main/robot.c
+    ${DXX_SRC}/main/scores.c
+    ${DXX_SRC}/main/slew.c
+    ${DXX_SRC}/main/songs.c
+    ${DXX_SRC}/main/state.c
+    ${DXX_SRC}/main/switch.c
+    ${DXX_SRC}/main/terrain.c
+    ${DXX_SRC}/main/texmerge.c
+    ${DXX_SRC}/main/text.c
+    ${DXX_SRC}/main/titles.c
+    ${DXX_SRC}/main/vclip.c
+    ${DXX_SRC}/main/vers_id.c
+    ${DXX_SRC}/main/wall.c
+    ${DXX_SRC}/main/weapon.c
+)
+
+# --------------------------------------------------------------------------
+# Game-specific sources
+# --------------------------------------------------------------------------
+if(DXX_GAME STREQUAL "d2x")
+    # D2-specific sources
+    list(APPEND SRC_MAIN
+        ${DXX_SRC}/main/ai2.c
+        ${DXX_SRC}/main/escort.c
+        ${DXX_SRC}/main/gamepal.c
+        ${DXX_SRC}/main/movie.c
+        ${DXX_SRC}/main/segment.c
+    )
+    set(SRC_LIBMVE
+        ${DXX_SRC}/libmve/decoder8.c
+        ${DXX_SRC}/libmve/decoder16.c
+        ${DXX_SRC}/libmve/mve_audio.c
+        ${DXX_SRC}/libmve/mvelib.c
+        ${DXX_SRC}/libmve/mveplay.c
+    )
+else()
+    # D1-specific sources
+    list(APPEND SRC_MAIN
+        ${DXX_SRC}/main/bmread.c
+        ${DXX_SRC}/main/custom.c
+        ${DXX_SRC}/main/snddecom.c
+    )
+    set(SRC_LIBMVE "")
+endif()
+
+# --------------------------------------------------------------------------
+# xmodel stub (xmodel requires GLEW/GL2.0+, not available on GLES 1.x)
+# --------------------------------------------------------------------------
+set(SRC_XMODEL_STUB
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../dxx-redux/android/xmodel_stub.c
+)
+
+# --------------------------------------------------------------------------
+# Build as shared library (libmain.so) for SDL2 Android
+# --------------------------------------------------------------------------
+add_library(main SHARED
+    ${SRC_2D}
+    ${SRC_3D}
+    ${SRC_IFF}
+    ${SRC_MATHS}
+    ${SRC_MEM}
+    ${SRC_MISC}
+    ${SRC_TEXMAP}
+    ${SRC_ARCH_OGL}
+    ${SRC_ARCH_SDL}
+    ${SRC_MAIN}
+    ${SRC_LIBMVE}
+    ${SRC_XMODEL_STUB}
+)
+
+# --------------------------------------------------------------------------
+# Include directories
+# --------------------------------------------------------------------------
+target_include_directories(main PRIVATE
+    ${DXX_SRC}/include
+    ${DXX_SRC}/arch/include
+    ${DXX_SRC}/main
+    ${SDL2_SOURCE_DIR}/include
+    ${SDL2_MIXER_SOURCE_DIR}/include
+    ${PHYSFS_INCLUDE_DIR}
+)
+
+# --------------------------------------------------------------------------
+# Compile definitions
+# --------------------------------------------------------------------------
+target_compile_definitions(main PRIVATE
+    # Platform
+    OGL
+    OGLES
+    NETWORK
+    USE_SDLMIXER
+    USE_UDP
+    USE_TRACKER
+    NO_ASM
+    HAVE_STRUCT_TIMESPEC
+    HAVE_STRUCT_TIMEVAL
+    SHAREPATH=""
+    # Version info
+    DXX_VERSION_MAJORi=1
+    DXX_VERSION_MINORi=1
+    DXX_VERSION_MICROi=0
+)
+
+# --------------------------------------------------------------------------
+# Compile options
+# --------------------------------------------------------------------------
+target_compile_options(main PRIVATE
+    -Wno-address-of-packed-member
+    -Wno-deprecated-declarations
+    -Wno-format-truncation
+    -Wno-format-overflow
+)
+
+# --------------------------------------------------------------------------
+# Link libraries
+# --------------------------------------------------------------------------
+target_link_libraries(main PRIVATE
+    SDL2
+    SDL2_mixer
+    physfs
+    GLESv1_CM
+    EGL
+    log
+    android
+    dl
+    m
+)
