@@ -302,6 +302,14 @@ chmod +x $ANDROID_PROJECT/gradlew
 # ============================================================
 # Step 7: Build the APK
 # ============================================================
+# Generate debug keystore if missing
+if [ ! -f $ANDROID_PROJECT/debug.keystore ]; then
+    keytool -genkey -v -keystore $ANDROID_PROJECT/debug.keystore \
+        -storepass android -alias androiddebugkey -keypass android \
+        -keyalg RSA -keysize 2048 -validity 10000 \
+        -dname "CN=Android Debug,O=Android,C=US"
+fi
+
 echo "=== Building APK ==="
 cd $ANDROID_PROJECT
 ./gradlew assembleDebug --no-daemon --stacktrace 2>&1

@@ -263,8 +263,9 @@ endif()
 # --------------------------------------------------------------------------
 # xmodel stub (xmodel requires GLEW/GL2.0+, not available on GLES 1.x)
 # --------------------------------------------------------------------------
-set(SRC_XMODEL_STUB
+set(SRC_ANDROID_STUBS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../dxx-redux/android/xmodel_stub.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../dxx-redux/android/messagebox.c
 )
 
 # --------------------------------------------------------------------------
@@ -282,7 +283,7 @@ add_library(main SHARED
     ${SRC_ARCH_SDL}
     ${SRC_MAIN}
     ${SRC_LIBMVE}
-    ${SRC_XMODEL_STUB}
+    ${SRC_ANDROID_STUBS}
 )
 
 # --------------------------------------------------------------------------
