@@ -8,7 +8,7 @@
 #include <string.h>
 #include <limits.h>
 #include <math.h>
-#include <SDL/SDL.h>
+#include <SDL.h>
 #include "gr.h"
 #include "grdef.h"
 #include "palette.h"
@@ -19,20 +19,19 @@
 #include "args.h"
 #include "config.h"
 
-int sdl_video_flags = SDL_SWSURFACE | SDL_HWPALETTE | SDL_DOUBLEBUF;
+Uint32 sdl_video_flags = 0;
+extern SDL_Window *sdl_window;
+static SDL_Renderer *sdl_renderer = NULL;
+static SDL_Texture *sdl_texture = NULL;
 SDL_Surface *screen,*canvas;
 int gr_installed = 0;
 
 void gr_flip()
 {
-	SDL_Rect src, dest;
-
-	dest.x = src.x = dest.y = src.y = 0;
-	dest.w = src.w = canvas->w;
-	dest.h = src.h = canvas->h;
-
-	SDL_BlitSurface(canvas, &src, screen, &dest);
-	SDL_Flip(screen);
+	SDL_UpdateTexture(sdl_texture, NULL, canvas->pixels, canvas->pitch);
+	SDL_RenderClear(sdl_renderer);
+	SDL_RenderCopy(sdl_renderer, sdl_texture, NULL, NULL);
+	SDL_RenderPresent(sdl_renderer);
 }
 
 // Set the buffer to draw to. 0 is front, 1 is back
@@ -45,89 +44,58 @@ void gr_set_draw_buffer(int buf)
 // returns possible (fullscreen) resolutions if any.
 int gr_list_modes( u_int32_t gsmodes[] )
 {
-	SDL_Rect** modes;
-	int i = 0, modesnum = 0;
-	int sdl_check_flags = sdl_video_flags;
-
-	sdl_check_flags |= SDL_FULLSCREEN; // always use Fullscreen as lead.
-
-	modes = SDL_ListModes(NULL, sdl_check_flags);
-
-	if (modes == (SDL_Rect**)0) // check if we get any modes - if not, return 0
-		return 0;
-
-
-	if (modes == (SDL_Rect**)-1)
-	{
-		return 0; // can obviously use any resolution... strange!
+	int modesnum = 0;
+	int num_modes = SDL_GetNumDisplayModes(0);
+	if (num_modes < 1) return 0;
+	for (int i = 0; i < num_modes; i++) {
+		SDL_DisplayMode mode;
+		if (SDL_GetDisplayMode(0, i, &mode) != 0) continue;
+		if (mode.w > 0xFFF0 || mode.h > 0xFFF0 || mode.w < 320 || mode.h < 200) continue;
+		gsmodes[modesnum] = SM(mode.w, mode.h);
+		modesnum++;
+		if (modesnum >= 50) break;
 	}
-	else
-	{
-		for (i = 0; modes[i]; ++i)
-		{
-			if (modes[i]->w > 0xFFF0 || modes[i]->h > 0xFFF0 // resolutions saved in 32bits. so skip bigger ones (unrealistic in 2010) (kreatordxx - made 0xFFF0 to kill warning)
-				|| modes[i]->w < 320 || modes[i]->h < 200) // also skip everything smaller than 320x200
-				continue;
-			gsmodes[modesnum] = SM(modes[i]->w,modes[i]->h);
-			modesnum++;
-			if (modesnum >= 50) // that really seems to be enough big boy.
-				break;
-		}
-		return modesnum;
-	}
+	return modesnum;
 }
 
 int gr_check_mode(u_int32_t mode)
 {
-	unsigned int w, h;
-
-	w=SM_W(mode);
-	h=SM_H(mode);
-
-	return SDL_VideoModeOK(w,h,GameArg.DbgBpp,sdl_video_flags);
+	return 32;
 }
 
 int gr_set_mode(u_int32_t mode)
 {
 	unsigned int w, h;
-
-	if (mode<=0)
-		return 0;
-
+	if (mode<=0) return 0;
 	w=SM_W(mode);
 	h=SM_H(mode);
-	screen=NULL;
 
-	sdl_video_flags = (sdl_video_flags & ~SDL_NOFRAME) | (GameCfg.BorderlessWindow ? SDL_NOFRAME : 0);
+	Uint32 flags = 0;
+	if (sdl_video_flags & SDL_WINDOW_FULLSCREEN)
+		flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+	if (GameCfg.BorderlessWindow)
+		flags |= SDL_WINDOW_BORDERLESS;
 
-	SDL_WM_SetCaption(DESCENT_VERSION, "Descent");
-	SDL_WM_SetIcon( SDL_LoadBMP( "d1x-redux.bmp" ), NULL );
-
-	if(SDL_VideoModeOK(w,h,GameArg.DbgBpp,sdl_video_flags))
-	{
-		screen=SDL_SetVideoMode(w, h, GameArg.DbgBpp, sdl_video_flags);
-	}
-	else
-	{
-		con_printf(CON_URGENT,"Cannot set %ix%i. Fallback to 640x480\n",w,h);
-		w=640;
-		h=480;
-		Game_screen_mode=mode=SM(w,h);
-		screen=SDL_SetVideoMode(w, h, GameArg.DbgBpp, sdl_video_flags);
+	if (sdl_window) {
+		SDL_SetWindowSize(sdl_window, w, h);
+	} else {
+		sdl_window = SDL_CreateWindow(DESCENT_VERSION,
+			SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags);
+		if (!sdl_window) { Error("Could not create window\n"); exit(1); }
 	}
 
-	if (screen == NULL)
-	{
-		Error("Could not set %dx%dx%d video mode\n",w,h,GameArg.DbgBpp);
-		exit(1);
-	}
+	if (sdl_renderer) SDL_DestroyRenderer(sdl_renderer);
+	sdl_renderer = SDL_CreateRenderer(sdl_window, -1, SDL_RENDERER_ACCELERATED);
+	if (!sdl_renderer) sdl_renderer = SDL_CreateRenderer(sdl_window, -1, 0);
+	if (!sdl_renderer) { Error("Could not create renderer\n"); exit(1); }
 
-	canvas = SDL_CreateRGBSurface(sdl_video_flags, w, h, 8, 0, 0, 0, 0);
-	if (canvas == NULL)
-	{
-		Error("Could not create canvas surface\n");
-		exit(1);
-	}
+	if (sdl_texture) SDL_DestroyTexture(sdl_texture);
+	sdl_texture = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_RGB332, SDL_TEXTUREACCESS_STREAMING, w, h);
+	if (!sdl_texture) { Error("Could not create texture\n"); exit(1); }
+
+	if (canvas) SDL_FreeSurface(canvas);
+	canvas = SDL_CreateRGBSurface(0, w, h, 8, 0, 0, 0, 0);
+	if (canvas == NULL) { Error("Could not create canvas surface\n"); exit(1); }
 
 	memset(grd_curscreen, 0, sizeof(grs_screen));
 	grd_curscreen->sc_mode = mode;
@@ -137,25 +105,24 @@ int gr_set_mode(u_int32_t mode)
 	gr_init_canvas(&grd_curscreen->sc_canvas, canvas->pixels, BM_LINEAR, w, h);
 	window_update_canvases();
 	gr_set_current_canvas(NULL);
-
 	SDL_ShowCursor(0);
 	gamefont_choose_game_font(w,h);
 	gr_palette_load(gr_palette);
-
 	return 0;
 }
 
 int gr_check_fullscreen(void)
 {
-	return (sdl_video_flags & SDL_FULLSCREEN)?1:0;
+	return (sdl_video_flags & SDL_WINDOW_FULLSCREEN)?1:0;
 }
 
 int gr_toggle_fullscreen(void)
 {
-	sdl_video_flags^=SDL_FULLSCREEN;
-	SDL_WM_ToggleFullScreen(screen);
-	GameCfg.WindowMode = (sdl_video_flags & SDL_FULLSCREEN)?0:1;
-	return (sdl_video_flags & SDL_FULLSCREEN)?1:0;
+	sdl_video_flags ^= SDL_WINDOW_FULLSCREEN;
+	if (sdl_window)
+		SDL_SetWindowFullscreen(sdl_window, (sdl_video_flags & SDL_WINDOW_FULLSCREEN) ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+	GameCfg.WindowMode = (sdl_video_flags & SDL_WINDOW_FULLSCREEN)?0:1;
+	return (sdl_video_flags & SDL_WINDOW_FULLSCREEN)?1:0;
 }
 
 void gr_set_attributes(void)
@@ -179,16 +146,10 @@ int gr_init(int mode)
 	memset( grd_curscreen, 0, sizeof(grs_screen));
 
 	if (!GameCfg.WindowMode && !GameArg.SysWindow)
-		sdl_video_flags|=SDL_FULLSCREEN;
+		sdl_video_flags|=SDL_WINDOW_FULLSCREEN;
 
 	if (GameArg.SysNoBorders)
-		sdl_video_flags|=SDL_NOFRAME;
-
-	if (GameArg.DbgSdlHWSurface)
-		sdl_video_flags|=SDL_HWSURFACE;
-
-	if (GameArg.DbgSdlASyncBlit)
-		sdl_video_flags|=SDL_ASYNCBLIT;
+		sdl_video_flags|=SDL_WINDOW_BORDERLESS;
 
 	// Set the mode.
 	if ((retcode=gr_set_mode(mode)))
@@ -213,6 +174,8 @@ void gr_close()
 	if (gr_installed==1)
 	{
 		gr_installed = 0;
+		if (sdl_texture) { SDL_DestroyTexture(sdl_texture); sdl_texture = NULL; }
+		if (sdl_renderer) { SDL_DestroyRenderer(sdl_renderer); sdl_renderer = NULL; }
 		d_free(grd_curscreen);
 		SDL_ShowCursor(1);
 		SDL_FreeSurface(canvas);
@@ -270,7 +233,7 @@ void gr_palette_step_up( int r, int g, int b )
 		colors[i].b = temp * 4;
 	}
 
-	SDL_SetColors(canvas, colors, 0, 256);
+	SDL_SetPaletteColors(canvas->format->palette, colors, 0, 256);
 }
 
 #undef min
@@ -314,7 +277,7 @@ void gr_palette_load( ubyte *pal )
 		colors[j].b = (min(gr_current_pal[i++] + gr_palette_gamma, 63)) * 4;
 	}
 
-	SDL_SetColors(canvas, colors, 0, 256);
+	SDL_SetPaletteColors(canvas->format->palette, colors, 0, 256);
 	init_computed_colors();
 }
 

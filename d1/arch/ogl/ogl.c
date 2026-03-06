@@ -10,13 +10,13 @@
 #include <windows.h>
 #include <stddef.h>
 #endif
+#ifdef OGLES
+#include <GLES/gl.h>
+#else
 #include <GL/glew.h>
 #if defined(__APPLE__) && defined(__MACH__)
 #include <OpenGL/gl.h>
 #include <OpenGL/glu.h>
-#else
-#ifdef OGLES
-#include <GLES/gl.h>
 #else
 #include <GL/gl.h>
 #include <GL/glu.h>

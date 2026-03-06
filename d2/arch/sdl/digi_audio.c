@@ -86,6 +86,7 @@ static const Uint8 mix8[] =
   0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 };
 
+static SDL_AudioDeviceID audio_device = 0;
 static int digi_initialised = 0;
 
 struct sound_slot {
@@ -124,8 +125,6 @@ static void audio_mixcallback(void *userdata, Uint8 *stream, int len)
 
 	memset(stream, 0x80, len); // fix "static" sound bug on Mac OS X
 
-	SDL_LockAudio();
-
 	for (sl = SoundSlots; sl < SoundSlots + MAX_SOUND_SLOTS; sl++) {
 		if (sl->playing) {
 			Uint8 *sldata = sl->samples + sl->position, *slend = sl->samples + sl->length;
@@ -160,8 +159,6 @@ static void audio_mixcallback(void *userdata, Uint8 *stream, int len)
 			sl->position = sldata - sl->samples;
 		}
 	}
-
-	SDL_UnlockAudio();
 }
 //end changes by adb
 
@@ -180,18 +177,17 @@ int digi_audio_init()
 	WaveSpec.samples = SOUND_BUFFER_SIZE;
 	WaveSpec.callback = audio_mixcallback;
 
-	if ( SDL_OpenAudio(&WaveSpec, NULL) < 0 ) {
-		//edited on 10/05/98 by Matt Mueller - should keep running, just with no sound.
+	audio_device = SDL_OpenAudioDevice(NULL, 0, &WaveSpec, NULL, 0);
+	if (audio_device == 0) {
 		Warning("\nError: Couldn't open audio: %s\n", SDL_GetError());
-		//killed  exit(2);
 		return 1;
-		//end edit -MM
 	}
-	SDL_PauseAudio(0);
+	SDL_PauseAudioDevice(audio_device, 0);
 
 	digi_initialised = 1;
 
 	digi_audio_set_digi_volume( (GameCfg.DigiVolume*32768)/8 );
+
 	return 0;
 }
 
@@ -206,7 +202,8 @@ void digi_audio_close()
 #ifdef __MINGW32__
 	SDL_Delay(500); // CloseAudio hangs if it's called too soon after opening?
 #endif
-	SDL_CloseAudio();
+	SDL_CloseAudioDevice(audio_device);
+	audio_device = 0;
 }
 
 void digi_audio_stop_all_channels()
@@ -232,7 +229,7 @@ int digi_audio_start_sound(short soundnum, fix volume, int pan, int looping, int
 
 	if (soundnum < 0) return -1;
 
-	SDL_LockAudio();
+	SDL_LockAudioDevice(audio_device);
 
 	Assert(GameSounds[soundnum].data != (void *)-1);
 
@@ -251,7 +248,7 @@ int digi_audio_start_sound(short soundnum, fix volume, int pan, int looping, int
 			next_channel = 0;
 		if (next_channel == starting_channel)
 		{
-			SDL_UnlockAudio();
+			SDL_UnlockAudioDevice(audio_device);
 			return -1;
 		}
 	}
@@ -288,7 +285,7 @@ int digi_audio_start_sound(short soundnum, fix volume, int pan, int looping, int
 	if (next_channel >= digi_max_channels)
 		next_channel = 0;
 
-	SDL_UnlockAudio();
+	SDL_UnlockAudioDevice(audio_device);
 
 	return i;
 }

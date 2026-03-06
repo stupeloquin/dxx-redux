@@ -3,7 +3,7 @@ add_library(arch_ogl STATIC
     ogl.c
     )
 
-if(OPENGLMERGE)
+if(OPENGLMERGE AND NOT ANDROID)
    target_sources(arch_ogl PRIVATE oglprog.c)
 endif()
 
@@ -15,6 +15,10 @@ target_compile_definitions(arch_ogl PUBLIC
     DXX_VERSION_MICROi=$<IF:$<BOOL:${PROJECT_VERSION_MICRO}>,${PROJECT_VERSION_MICRO},0>
     )
 
-find_package(SDL)
-find_package(PhysFS)
-target_include_directories(arch_ogl PUBLIC ${SDL_INCLUDE_DIR} ${PHYSFS_INCLUDE_DIR})
+if(ANDROID)
+    target_include_directories(arch_ogl PUBLIC ${PHYSFS_INCLUDE_DIR})
+else()
+    find_package(SDL2 REQUIRED)
+    find_package(PhysFS)
+    target_include_directories(arch_ogl PUBLIC ${SDL2_INCLUDE_DIRS} ${PHYSFS_INCLUDE_DIR})
+endif()

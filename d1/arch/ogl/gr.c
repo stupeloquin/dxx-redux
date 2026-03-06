@@ -6,11 +6,6 @@
 
 #define DECLARE_VARS
 
-#ifdef RPI
-// extra libraries for the Raspberry Pi
-#include  "bcm_host.h"
-#endif
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -58,369 +53,63 @@
 #if defined(__APPLE__) && defined(__MACH__)
 #include <OpenGL/glu.h>
 #else
-#ifdef OGLES
-#include <EGL/egl.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <SDL/SDL_syswm.h>
-#else
+#ifndef OGLES
 #include <GL/glu.h>
 #endif
 #endif
 
 #ifdef OGLES
-int sdl_video_flags = 0;
-
-#ifdef RPI
-static EGL_DISPMANX_WINDOW_T nativewindow;
-static DISPMANX_ELEMENT_HANDLE_T dispman_element=DISPMANX_NO_HANDLE;
-static DISPMANX_DISPLAY_HANDLE_T dispman_display=DISPMANX_NO_HANDLE;
-#endif
-
+Uint32 sdl_video_flags = SDL_WINDOW_OPENGL;
 #else
-int sdl_video_flags = SDL_OPENGL;
+Uint32 sdl_video_flags = SDL_WINDOW_OPENGL;
 #endif
 int gr_installed = 0;
+SDL_Window *sdl_window = NULL;
+SDL_GLContext sdl_gl_context = NULL;
 int gl_initialized=0;
 int linedotscale=1; // scalar of glLinewidth and glPointSize - only calculated once when resolution changes
 int sdl_no_modeswitch=0;
 
-#ifdef OGLES
-EGLDisplay eglDisplay=EGL_NO_DISPLAY;
-EGLConfig eglConfig;
-EGLSurface eglSurface=EGL_NO_SURFACE;
-EGLContext eglContext=EGL_NO_CONTEXT;
-
-bool TestEGLError(char* pszLocation)
-{
-	/*
-	 * eglGetError returns the last error that has happened using egl,
-	 * not the status of the last called function. The user has to
-	 * check after every single egl call or at least once every frame.
-	*/
-	EGLint iErr = eglGetError();
-	if (iErr != EGL_SUCCESS)
-	{
-		con_printf(CON_URGENT, "%s failed (%d).\n", pszLocation, iErr);
-		return 0;
-	}
-	
-	return 1;
-}
-#endif
-
 void ogl_swap_buffers_internal(void)
 {
-#ifdef OGLES
-	eglSwapBuffers(eglDisplay, eglSurface);
-#else
-	SDL_GL_SwapBuffers();
-#endif
+	SDL_GL_SwapWindow(sdl_window);
 }
-
-#ifdef RPI
-
-// MH: I got the following constants for vc_dispmanx_element_change_attributes() from:
-//     http://qt.gitorious.org/qt/qtbase/commit/5933205cfcd73481cb0645fa6183103063fe3e0d
-//     I do not know where they got them from, but OTOH, they are quite obvious.
-
-// these constants are not in any headers (yet)
-#define ELEMENT_CHANGE_LAYER          (1<<0)
-#define ELEMENT_CHANGE_OPACITY        (1<<1)
-#define ELEMENT_CHANGE_DEST_RECT      (1<<2)
-#define ELEMENT_CHANGE_SRC_RECT       (1<<3)
-#define ELEMENT_CHANGE_MASK_RESOURCE  (1<<4)
-#define ELEMENT_CHANGE_TRANSFORM      (1<<5)
-
-void rpi_destroy_element(void)
-{
-	if (dispman_element != DISPMANX_NO_HANDLE) {
-		DISPMANX_UPDATE_HANDLE_T dispman_update;
-		con_printf(CON_DEBUG, "RPi: destroying display manager element\n");
-		dispman_update = vc_dispmanx_update_start( 0 );
-		if (vc_dispmanx_element_remove( dispman_update, dispman_element)) {
-			 con_printf(CON_URGENT, "RPi: failed to remove dispmanx element!\n");
-		}
-		vc_dispmanx_update_submit_sync( dispman_update );
-		dispman_element = DISPMANX_NO_HANDLE;
-	}
-}
-
-int rpi_setup_element(int x, int y, Uint32 video_flags, int update)
-{
-	// this code is based on the work of Ben O'Steen
-	// http://benosteen.wordpress.com/2012/04/27/using-opengl-es-2-0-on-the-raspberry-pi-without-x-windows/
-	// https://github.com/benosteen/opengles-book-samples/tree/master/Raspi
-	DISPMANX_UPDATE_HANDLE_T dispman_update;
-	VC_RECT_T dst_rect;
-	VC_RECT_T src_rect;
-	VC_DISPMANX_ALPHA_T alpha_descriptor;
-
-	uint32_t rpi_display_device=DISPMANX_ID_MAIN_LCD;
-	uint32_t display_width;
-	uint32_t display_height;
-	int success;
-
-	success = graphics_get_display_size(rpi_display_device, &display_width, &display_height);
-	if ( success < 0 ) {
-		con_printf(CON_URGENT, "Could not get RPi display size, assuming 640x480\n");
-		display_width=640;
-		display_height=480;
-	}
-
-	if ((uint32_t)x > display_width) {
-		con_printf(CON_URGENT, "RPi: Requested width %d exceeds display width %u, scaling down!\n",
-			x,display_width);
-		x=(int)display_width;
-	}
-	if ((uint32_t)y > display_height) {
-		con_printf(CON_URGENT, "RPi: Requested height %d exceeds display height %u, scaling down!\n",
-			y,display_height);
-		y=(int)display_height;
-	}
-
-	con_printf(CON_DEBUG, "RPi: display resolution %ux%u, game resolution: %dx%d (%s)\n", display_width, display_height, x, y, (video_flags & SDL_FULLSCREEN)?"fullscreen":"windowed");
-	if (video_flags & SDL_FULLSCREEN) {
-		/* scale to the full display size... */
-		dst_rect.x = 0;
-		dst_rect.y = 0;
-		dst_rect.width = display_width;
-		dst_rect.height= display_height;
-	} else {
-		/* TODO: we could query the position of the X11 window here
-		   and try to place the ovelray exactly above that...,
-		   we would have to track window movements, though ... */
-		dst_rect.x = 0;
-		dst_rect.y = 0;
-		dst_rect.width = (uint32_t)x;
-		dst_rect.height= (uint32_t)y;
-	}
-
-	src_rect.x = 0;
-	src_rect.y = 0;
-	src_rect.width = ((uint32_t)x)<< 16;
-	src_rect.height =((uint32_t)y)<< 16;
-
-	/* we do not want our overlay to be blended against the background */
-	alpha_descriptor.flags=DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS;
-	alpha_descriptor.opacity=0xffffffff;
-	alpha_descriptor.mask=0;
-
-	// open display, if we do not already have one ...
-	if (dispman_display == DISPMANX_NO_HANDLE) {
-		con_printf(CON_DEBUG, "RPi: opening display: %u\n",rpi_display_device);
-		dispman_display = vc_dispmanx_display_open(rpi_display_device);
-		if (dispman_display == DISPMANX_NO_HANDLE) {
-			con_printf(CON_URGENT,"RPi: failed to open display: %u\n",rpi_display_device);
-		}
-	}
-
-	if (dispman_element != DISPMANX_NO_HANDLE) {
-		if (!update) {
-			// if the element already exists, and we cannot update it, so recreate it
-			rpi_destroy_element();
-		}
-	} else {
-		// if the element does not exist, we cannot do an update
-		update=0;
-	}
-
-	dispman_update = vc_dispmanx_update_start( 0 );
-
-	if (update) {
-		con_printf(CON_DEBUG, "RPi: updating display manager element\n");
-		vc_dispmanx_element_change_attributes ( dispman_update, nativewindow.element,
-							ELEMENT_CHANGE_DEST_RECT | ELEMENT_CHANGE_SRC_RECT,
-							0 /*layer*/, 0 /*opacity*/,
-							&dst_rect, &src_rect,
-							0 /*mask*/, VC_IMAGE_ROT0 /*transform*/);
-	} else {
-		// create a new element
-		con_printf(CON_DEBUG, "RPi: creating display manager element\n");
-		dispman_element = vc_dispmanx_element_add ( dispman_update, dispman_display,
-								0 /*layer*/, &dst_rect, 0 /*src*/,
-								&src_rect, DISPMANX_PROTECTION_NONE,
-								&alpha_descriptor, NULL /*clamp*/,
-								VC_IMAGE_ROT0 /*transform*/);
-		if (dispman_element == DISPMANX_NO_HANDLE) {
-			con_printf(CON_URGENT,"RPi: failed to creat display manager elemenr\n");
-		}
-		nativewindow.element = dispman_element;
-	}
-	nativewindow.width = display_width;
-	nativewindow.height = display_height;
-	vc_dispmanx_update_submit_sync( dispman_update );
-
-	return 0;
-}
-
-#endif // RPI
-
-#ifdef OGLES
-void ogles_destroy(void)
-{
-	if( eglDisplay != EGL_NO_DISPLAY ) {
-		eglMakeCurrent(eglDisplay, NULL, NULL, EGL_NO_CONTEXT);
-	}
-
-	if (eglContext != EGL_NO_CONTEXT) {
-		con_printf(CON_DEBUG, "EGL: destroyig context\n");
-		eglDestroyContext(eglDisplay, eglContext);
-		eglContext = EGL_NO_CONTEXT;
-	}
-
-	if (eglSurface != EGL_NO_SURFACE) {
-		con_printf(CON_DEBUG, "EGL: destroyig surface\n");
-		eglDestroySurface(eglDisplay, eglSurface);
-		eglSurface = EGL_NO_SURFACE;
-	}
-
-	if (eglDisplay != EGL_NO_DISPLAY) {
-		con_printf(CON_DEBUG, "EGL: terminating\n");
-		eglTerminate(eglDisplay);
-		eglDisplay = EGL_NO_DISPLAY;
-	}
-}
-#endif
 
 int ogl_init_window(int x, int y)
 {
-	int use_x,use_y,use_bpp;
-	Uint32 use_flags;
-
-#ifdef OGLES
-	SDL_SysWMinfo info;
-	Window    x11Window = 0;
-	Display*  x11Display = 0;
-	EGLint    ver_maj, ver_min;
-	EGLint configAttribs[] =
-	{
-		EGL_RED_SIZE, 5,
-		EGL_GREEN_SIZE, 6,
-		EGL_BLUE_SIZE, 5,
-		EGL_DEPTH_SIZE, 16,
-		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-		EGL_RENDERABLE_TYPE, EGL_OPENGL_ES_BIT,
-		EGL_NONE, EGL_NONE
-	};
-
-	// explicitely request an OpenGL ES 1.x context
-        EGLint contextAttribs[] = { EGL_CONTEXT_CLIENT_VERSION, 1, EGL_NONE, EGL_NONE };
-	// explicitely request a doublebuffering window
-        EGLint winAttribs[] = { EGL_RENDER_BUFFER, EGL_BACK_BUFFER, EGL_NONE, EGL_NONE };
-
-	int iConfigs;
-#endif // OGLES
+	Uint32 use_flags = sdl_video_flags;
 
 	if (gl_initialized)
-		ogl_smash_texture_list_internal();//if we are or were fullscreen, changing vid mode will invalidate current textures
+		ogl_smash_texture_list_internal();
 
-	SDL_WM_SetCaption(DESCENT_VERSION, "Descent");
-	SDL_WM_SetIcon( SDL_LoadBMP( "d1x-redux.bmp" ), NULL );
-
-	use_x=x;
-	use_y=y;
-	use_bpp=GameArg.DbgBpp;
-	use_flags=sdl_video_flags;
-	if (sdl_no_modeswitch) {
-		const SDL_VideoInfo *vinfo=SDL_GetVideoInfo();
-		if (vinfo) {	
-			use_x=vinfo->current_w;
-			use_y=vinfo->current_h;
-			use_bpp=vinfo->vfmt->BitsPerPixel;
-			use_flags=SDL_SWSURFACE | SDL_ANYFORMAT;
-		} else {
-			con_printf(CON_URGENT, "Could not query video info\n");
-		}
-	}
-
-	if (!SDL_SetVideoMode(use_x, use_y, use_bpp, use_flags))
-	{
-#ifdef RPI
-		con_printf(CON_URGENT, "Could not set %dx%dx%d opengl video mode: %s\n (Ignored for RPI)",
-			    x, y, GameArg.DbgBpp, SDL_GetError());
-#else
-		Error("Could not set %dx%dx%d opengl video mode: %s\n", x, y, GameArg.DbgBpp, SDL_GetError());
-#endif
-	}
+	if (sdl_window) {
+		SDL_SetWindowSize(sdl_window, x, y);
+		SDL_SetWindowTitle(sdl_window, DESCENT_VERSION);
+	} else {
+		use_flags |= SDL_WINDOW_OPENGL;
+		if (sdl_video_flags & SDL_WINDOW_FULLSCREEN)
+			use_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
 
 #ifdef OGLES
-#ifndef RPI
-	// NOTE: on the RPi, the EGL stuff is not connected to the X11 window,
-	//       so there is no need to destroy and recreate this
-	ogles_destroy();
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 1);
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
 #endif
 
-	SDL_VERSION(&info.version);
-	
-	if (SDL_GetWMInfo(&info) > 0) {
-		if (info.subsystem == SDL_SYSWM_X11) {
-			x11Display = info.info.x11.display;
-			x11Window = info.info.x11.window;
-			con_printf (CON_DEBUG, "Display: %p, Window: %i ===\n", (void*)x11Display, (int)x11Window);
-		}
+		sdl_window = SDL_CreateWindow(DESCENT_VERSION,
+			SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+			x, y, use_flags);
+		if (!sdl_window)
+			Error("Could not create window: %s\n", SDL_GetError());
+
+		sdl_gl_context = SDL_GL_CreateContext(sdl_window);
+		if (!sdl_gl_context)
+			Error("Could not create GL context: %s\n", SDL_GetError());
 	}
 
-	if (eglDisplay == EGL_NO_DISPLAY) {
-#ifdef RPI
-		eglDisplay = eglGetDisplay((EGLNativeDisplayType)EGL_DEFAULT_DISPLAY);
-#else
-		eglDisplay = eglGetDisplay((EGLNativeDisplayType)x11Display);
-#endif
-		if (eglDisplay == EGL_NO_DISPLAY) {
-			con_printf(CON_URGENT, "EGL: Error querying EGL Display\n");
-		}
-
-		if (!eglInitialize(eglDisplay, &ver_maj, &ver_min)) {
-			con_printf(CON_URGENT, "EGL: Error initializing EGL\n");
-		} else {
-			con_printf(CON_DEBUG, "EGL: Initialized, version: major %i minor %i\n", ver_maj, ver_min);
-		}
-	}
-
-	
-#ifdef RPI
-	if (rpi_setup_element(x,y,sdl_video_flags,1)) {
-		Error("RPi: Could not set up a %dx%d element\n", x, y);
-	}
-#endif
-
-	if (eglSurface == EGL_NO_SURFACE) {
-		if (!eglChooseConfig(eglDisplay, configAttribs, &eglConfig, 1, &iConfigs) || (iConfigs != 1)) {
-			con_printf(CON_URGENT, "EGL: Error choosing config\n");
-		} else {
-			con_printf(CON_DEBUG, "EGL: config chosen\n");
-		}
-
-#ifdef RPI
-		eglSurface = eglCreateWindowSurface(eglDisplay, eglConfig, (EGLNativeWindowType)&nativewindow, winAttribs);
-#else
-		eglSurface = eglCreateWindowSurface(eglDisplay, eglConfig, (NativeWindowType)x11Window, winAttribs);
-#endif
-		if ((!TestEGLError("eglCreateWindowSurface")) || eglSurface == EGL_NO_SURFACE) {
-			con_printf(CON_URGENT, "EGL: Error creating window surface\n");
-		} else {
-			con_printf(CON_DEBUG, "EGL: Created window surface\n");
-		}
-	}
-	
-	if (eglContext == EGL_NO_CONTEXT) {
-		eglContext = eglCreateContext(eglDisplay, eglConfig, EGL_NO_CONTEXT, contextAttribs);
-		if ((!TestEGLError("eglCreateContext")) || eglContext == EGL_NO_CONTEXT) {
-			con_printf(CON_URGENT, "EGL: Error creating context\n");
-		} else {
-			con_printf(CON_DEBUG, "EGL: Created context\n");
-		}
-	}
-	
-	eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
-	if (!TestEGLError("eglMakeCurrent")) {
-		con_printf(CON_URGENT, "EGL: Error making current\n");
-	} else {
-		con_printf(CON_DEBUG, "EGL: made context current\n");
-	}
-#endif
+#ifndef OGLES
 	glewInit();
+#endif
 #ifdef OGL_MERGE
 	ogl_init_prog();
 #endif
@@ -428,41 +117,26 @@ int ogl_init_window(int x, int y)
 		ogl_cache_level_textures();
 
 	linedotscale = ((x/640<y/480?x/640:y/480)<1?1:(x/640<y/480?x/640:y/480));
-
 	gl_initialized=1;
 	return 0;
 }
 
 int gr_check_fullscreen(void)
 {
-	return (sdl_video_flags & SDL_FULLSCREEN)?1:0;
+	return (sdl_video_flags & SDL_WINDOW_FULLSCREEN)?1:0;
 }
 
 int gr_toggle_fullscreen(void)
 {
-	if (sdl_video_flags & SDL_FULLSCREEN)
-		sdl_video_flags &= ~SDL_FULLSCREEN;
+	if (sdl_video_flags & SDL_WINDOW_FULLSCREEN)
+		sdl_video_flags &= ~SDL_WINDOW_FULLSCREEN;
 	else
-		sdl_video_flags |= SDL_FULLSCREEN;
+		sdl_video_flags |= SDL_WINDOW_FULLSCREEN;
 
 	if (gl_initialized)
 	{
-		if (sdl_no_modeswitch == 0) {
-			if (!SDL_VideoModeOK(SM_W(Game_screen_mode), SM_H(Game_screen_mode), GameArg.DbgBpp, sdl_video_flags))
-			{
-				con_printf(CON_URGENT,"Cannot set %ix%i. Fallback to 640x480\n",SM_W(Game_screen_mode), SM_H(Game_screen_mode));
-				Game_screen_mode=SM(640,480);
-			}
-			if (!SDL_SetVideoMode(SM_W(Game_screen_mode), SM_H(Game_screen_mode), GameArg.DbgBpp, sdl_video_flags))
-			{
-				Error("Could not set %dx%dx%d opengl video mode: %s\n", SM_W(Game_screen_mode), SM_H(Game_screen_mode), GameArg.DbgBpp, SDL_GetError());
-			}
-		}
-#ifdef RPI
-		if (rpi_setup_element(SM_W(Game_screen_mode), SM_H(Game_screen_mode), sdl_video_flags, 1)) {
-			 Error("RPi: Could not set up %dx%d element\n", SM_W(Game_screen_mode), SM_H(Game_screen_mode));
-		}
-#endif
+		Uint32 flag = (sdl_video_flags & SDL_WINDOW_FULLSCREEN) ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
+		SDL_SetWindowFullscreen(sdl_window, flag);
 	}
 
 	if (gl_initialized) // update viewing values for menus
@@ -485,8 +159,8 @@ int gr_toggle_fullscreen(void)
 		if (Game_wind)
 			ogl_cache_level_textures();
 	}
-	GameCfg.WindowMode = (sdl_video_flags & SDL_FULLSCREEN)?0:1;
-	return (sdl_video_flags & SDL_FULLSCREEN)?1:0;
+	GameCfg.WindowMode = (sdl_video_flags & SDL_WINDOW_FULLSCREEN)?0:1;
+	return (sdl_video_flags & SDL_WINDOW_FULLSCREEN)?1:0;
 }
 
 static void ogl_init_state(void)
@@ -573,58 +247,24 @@ void ogl_get_verinfo(void)
 // returns possible (fullscreen) resolutions if any.
 int gr_list_modes( u_int32_t gsmodes[] )
 {
-	SDL_Rect** modes;
-	int i = 0, modesnum = 0;
-#ifdef OGLES
-	int sdl_check_flags = SDL_FULLSCREEN; // always use Fullscreen as lead.
-#else
-	int sdl_check_flags = SDL_OPENGL | SDL_FULLSCREEN; // always use Fullscreen as lead.
-#endif
-
-	if (sdl_no_modeswitch) {
-		/* TODO: we could use the tvservice to list resolutions on the RPi */
-		return 0;
+	int modesnum = 0;
+	int num_modes = SDL_GetNumDisplayModes(0);
+	if (num_modes < 1) return 0;
+	for (int i = 0; i < num_modes; i++) {
+		SDL_DisplayMode mode;
+		if (SDL_GetDisplayMode(0, i, &mode) != 0) continue;
+		if (mode.w > 0xFFF0 || mode.h > 0xFFF0 || mode.w < 320 || mode.h < 200)
+			continue;
+		gsmodes[modesnum] = SM(mode.w, mode.h);
+		modesnum++;
+		if (modesnum >= 50) break;
 	}
-
-	modes = SDL_ListModes(NULL, sdl_check_flags);
-
-	if (modes == (SDL_Rect**)0) // check if we get any modes - if not, return 0
-		return 0;
-
-
-	if (modes == (SDL_Rect**)-1)
-	{
-		return 0; // can obviously use any resolution... strange!
-	}
-	else
-	{
-		for (i = 0; modes[i]; ++i)
-		{
-			if (modes[i]->w > 0xFFF0 || modes[i]->h > 0xFFF0 // resolutions saved in 32bits. so skip bigger ones (unrealistic in 2010) (changed to 0xFFF0 to fix warning)
-				|| modes[i]->w < 320 || modes[i]->h < 200) // also skip everything smaller than 320x200
-				continue;
-			gsmodes[modesnum] = SM(modes[i]->w,modes[i]->h);
-			modesnum++;
-			if (modesnum >= 50) // that really seems to be enough big boy.
-				break;
-		}
-		return modesnum;
-	}
+	return modesnum;
 }
 
 int gr_check_mode(u_int32_t mode)
 {
-	unsigned int w, h;
-
-	w=SM_W(mode);
-	h=SM_H(mode);
-
-	if (sdl_no_modeswitch == 0) {
-		return SDL_VideoModeOK(w, h, GameArg.DbgBpp, sdl_video_flags);
-	} else {
-		// just tell the caller that any mode is valid...
-		return 32;
-	}
+	return 32;
 }
 
 int gr_set_mode(u_int32_t mode)
@@ -655,7 +295,7 @@ int gr_set_mode(u_int32_t mode)
 	gr_init_canvas(&grd_curscreen->sc_canvas, d_realloc(gr_bm_data,w*h), BM_OGL, w, h);
 	gr_set_current_canvas(NULL);
 
-	sdl_video_flags = (sdl_video_flags & ~SDL_NOFRAME) | (GameCfg.BorderlessWindow ? SDL_NOFRAME : 0);
+	sdl_video_flags = (sdl_video_flags & ~SDL_WINDOW_BORDERLESS) | (GameCfg.BorderlessWindow ? SDL_WINDOW_BORDERLESS : 0);
 
 	ogl_init_window(w,h);//platform specific code
 	ogl_get_verinfo();
@@ -713,12 +353,7 @@ void gr_set_attributes(void)
 #ifndef OGLES
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE,0);
-	SDL_GL_SetAttribute(SDL_GL_ACCUM_RED_SIZE,0);
-	SDL_GL_SetAttribute(SDL_GL_ACCUM_GREEN_SIZE,0);
-	SDL_GL_SetAttribute(SDL_GL_ACCUM_BLUE_SIZE,0);
-	SDL_GL_SetAttribute(SDL_GL_ACCUM_ALPHA_SIZE,0);
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
-	SDL_GL_SetAttribute(SDL_GL_SWAP_CONTROL,GameCfg.VSync);
 	if (GameCfg.Multisample)
 	{
 		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
@@ -730,6 +365,7 @@ void gr_set_attributes(void)
 		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
 	}
 #endif
+	SDL_GL_SetSwapInterval(GameCfg.VSync);
 	ogl_smash_texture_list_internal();
 #ifdef OGL_MERGE
 	if (gl_initialized)
@@ -741,41 +377,21 @@ void gr_set_attributes(void)
 
 int gr_init(int mode)
 {
-#ifdef RPI
-	char sdl_driver[32];
-	char *sdl_driver_ret;
-#endif
-
 	int retcode;
 
 	// Only do this function once!
 	if (gr_installed==1)
 		return -1;
 
-#ifdef RPI
-	// Initialize the broadcom host library
-	// we have to call this before we can create an OpenGL ES context
-	bcm_host_init();
-
-	// Check if we are running with SDL directfb driver ...
-	sdl_driver_ret=SDL_VideoDriverName(sdl_driver,32);
-	if (sdl_driver_ret) {
-		if (strcmp(sdl_driver_ret,"x11")) {
-			con_printf(CON_URGENT,"RPi: activating hack for console driver\n");
-			sdl_no_modeswitch=1;
-		}
-	}
-#endif
-
 #ifdef _WIN32
 	ogl_init_load_library();
 #endif
 
 	if (!GameCfg.WindowMode && !GameArg.SysWindow)
-		sdl_video_flags|=SDL_FULLSCREEN;
+		sdl_video_flags|=SDL_WINDOW_FULLSCREEN;
 
 	if (GameArg.SysNoBorders)
-		sdl_video_flags|=SDL_NOFRAME;
+		sdl_video_flags|=SDL_WINDOW_BORDERLESS;
 
 	gr_set_attributes();
 
@@ -826,18 +442,8 @@ void gr_close()
 		OpenGL_LoadLibrary(false);
 #endif
 
-#ifdef OGLES
-	ogles_destroy();
-#ifdef RPI
-	con_printf(CON_DEBUG, "RPi: cleanuing up\n");
-	if (dispman_display != DISPMANX_NO_HANDLE) {
-		rpi_destroy_element();
-		con_printf(CON_DEBUG, "RPi: closing display\n");
-		vc_dispmanx_display_close(dispman_display);
-		dispman_display = DISPMANX_NO_HANDLE;
-	}
-#endif
-#endif
+	if (sdl_gl_context) { SDL_GL_DeleteContext(sdl_gl_context); sdl_gl_context = NULL; }
+	if (sdl_window) { SDL_DestroyWindow(sdl_window); sdl_window = NULL; }
 }
 
 extern int r_upixelc;
@@ -869,7 +475,7 @@ unsigned char ogl_ugpixel( grs_bitmap * bitmap, int x, int y )
 #endif
 
 	glReadPixels(bitmap->bm_x + x, SHEIGHT - bitmap->bm_y - y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, buf);
-	
+
 	return gr_find_closest_color(buf[0]/4, buf[1]/4, buf[2]/4);
 }
 
@@ -912,7 +518,7 @@ void ogl_urect(int left,int top,int right,int bot)
 	vertex_array[5] = yf;
 	vertex_array[6] = xf;
 	vertex_array[7] = yo;
-	
+
 	glVertexPointer(2, GL_FLOAT, 0, vertex_array);
 	glColorPointer(4, GL_FLOAT, 0, color_array);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);//replaced GL_QUADS
@@ -927,12 +533,12 @@ void ogl_ulinec(int left,int top,int right,int bot,int c)
 
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_COLOR_ARRAY);
-	
+
 	xo = (left + grd_curcanv->cv_bitmap.bm_x + 0.5) / (float)last_width;
 	xf = (right + grd_curcanv->cv_bitmap.bm_x + 0.5) / (float)last_width;
 	yo = 1.0 - (top + grd_curcanv->cv_bitmap.bm_y + 0.5) / (float)last_height;
 	yf = 1.0 - (bot + grd_curcanv->cv_bitmap.bm_y + 0.5) / (float)last_height;
- 
+
 	OGL_DISABLE(TEXTURE_2D);
 
 	vertex_array[0] = xo;
@@ -959,7 +565,7 @@ void ogl_do_palfx(void)
 
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_COLOR_ARRAY);
- 
+
 	if (do_pal_step)
 	{
 		glEnable(GL_BLEND);
@@ -967,7 +573,7 @@ void ogl_do_palfx(void)
 	}
 	else
 		return;
- 
+
 	glVertexPointer(2, GL_FLOAT, 0, vertex_array);
 	glColorPointer(4, GL_FLOAT, 0, color_array);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);//replaced GL_QUADS

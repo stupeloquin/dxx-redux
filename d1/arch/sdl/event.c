@@ -17,9 +17,12 @@
 
 #include "joy.h"
 
+extern SDL_Window *sdl_window;
+
 extern void key_handler(SDL_KeyboardEvent *event);
 extern void mouse_button_handler(SDL_MouseButtonEvent *mbe);
 extern void mouse_motion_handler(SDL_MouseMotionEvent *mme);
+extern void mouse_wheel_handler(SDL_MouseWheelEvent *whe);
 extern void mouse_cursor_autohide();
 
 static int initialised=0;
@@ -30,7 +33,7 @@ void event_poll()
 	int clean_uniframe=1;
 	window *wind = window_get_front();
 	int idle = 1;
-	
+
 	// If the front window changes, exit this loop, otherwise unintended behavior can occur
 	// like pressing 'Return' really fast at 'Difficulty Level' causing multiple games to be started
 	while ((wind == window_get_front()) && SDL_PollEvent(&event))
@@ -57,6 +60,12 @@ void event_poll()
 				mouse_motion_handler((SDL_MouseMotionEvent *)&event);
 				idle = 0;
 				break;
+			case SDL_MOUSEWHEEL:
+				if (GameArg.CtlNoMouse)
+					break;
+				mouse_wheel_handler(&event.wheel);
+				idle = 0;
+				break;
 			case SDL_JOYBUTTONDOWN:
 			case SDL_JOYBUTTONUP:
 				if (GameArg.CtlNoJoystick)
@@ -80,6 +89,16 @@ void event_poll()
 				break;
 			case SDL_JOYBALLMOTION:
 				break;
+			case SDL_WINDOWEVENT:
+				switch(event.window.event) {
+					case SDL_WINDOWEVENT_FOCUS_GAINED:
+						event_toggle_focus(1);
+						break;
+					case SDL_WINDOWEVENT_FOCUS_LOST:
+						event_toggle_focus(0);
+						break;
+				}
+				break;
 			case SDL_QUIT: {
 				d_event qevent = { EVENT_QUIT };
 				call_default_handler(&qevent);
@@ -92,20 +111,20 @@ void event_poll()
 	if (idle)
 	{
 		d_event ievent;
-		
+
 		ievent.type = EVENT_IDLE;
 		event_send(&ievent);
 	}
 	else
 		event_reset_idle_seconds();
-	
+
 	mouse_cursor_autohide();
 }
 
 void event_flush()
 {
 	SDL_Event event;
-	
+
 	while (SDL_PollEvent(&event));
 }
 
@@ -128,7 +147,7 @@ int call_default_handler(d_event *event)
 {
 	if (default_handler)
 		return (*default_handler)(event);
-	
+
 	return 0;
 }
 
@@ -147,7 +166,7 @@ void event_send(d_event *event)
 			if (window_is_modal(wind))
 				break;
 		}
-	
+
 	if (!handled)
 		call_default_handler(event);
 }
@@ -168,7 +187,7 @@ void event_process(void)
 	// such as some network menus when they report a problem
 	if (window_get_front() != wind)
 		return;
-	
+
 	event.type = EVENT_WINDOW_DRAW;	// then draw all visible windows
 	wind = window_get_first();
 	while (wind != NULL)
@@ -192,9 +211,10 @@ void event_process(void)
 void event_toggle_focus(int activate_focus)
 {
 	if (activate_focus && GameCfg.Grabinput)
-		SDL_WM_GrabInput(SDL_GRAB_ON);
+		SDL_SetWindowGrab(sdl_window, SDL_TRUE);
 	else
-		SDL_WM_GrabInput(SDL_GRAB_OFF);
+		SDL_SetWindowGrab(sdl_window, SDL_FALSE);
+	SDL_SetRelativeMouseMode(activate_focus ? SDL_TRUE : SDL_FALSE);
 	mouse_toggle_cursor(!activate_focus);
 }
 
@@ -209,4 +229,3 @@ fix event_get_idle_seconds()
 {
 	return (timer_query() - last_event)/F1_0;
 }
-

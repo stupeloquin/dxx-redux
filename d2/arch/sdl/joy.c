@@ -57,12 +57,28 @@ static struct {
 	int axis_button_map[MAX_AXES_PER_JOYSTICK];
 } SDL_Joysticks[MAX_JOYSTICKS];
 
+/* In SDL2, event->which is an SDL_JoystickID (instance ID), not a device index.
+ * Map it back to our joystick array index.
+ */
+static int joy_instance_to_index(SDL_JoystickID id)
+{
+	for (int i = 0; i < num_joysticks; i++)
+		if (SDL_JoystickInstanceID(SDL_Joysticks[i].handle) == id)
+			return i;
+	return -1;
+}
+
 void joy_button_handler(SDL_JoyButtonEvent *jbe)
 {
 	int button;
+	int joy_index;
 	d_event_joystickbutton event;
 
-	button = SDL_Joysticks[jbe->which].button_map[jbe->button];
+	joy_index = joy_instance_to_index(jbe->which);
+	if (joy_index < 0)
+		return;
+
+	button = SDL_Joysticks[joy_index].button_map[jbe->button];
 
 	Joystick.button_state[button] = jbe->state;
 
@@ -74,9 +90,16 @@ void joy_button_handler(SDL_JoyButtonEvent *jbe)
 
 void joy_hat_handler(SDL_JoyHatEvent *jhe)
 {
-	int hat = SDL_Joysticks[jhe->which].hat_map[jhe->hat];
+	int joy_index;
+	int hat;
 	int hbi;
 	d_event_joystickbutton event;
+
+	joy_index = joy_instance_to_index(jhe->which);
+	if (joy_index < 0)
+		return;
+
+	hat = SDL_Joysticks[joy_index].hat_map[jhe->hat];
 
 	//Save last state of the hat-button
 	Joystick.button_last_state[hat  ] = Joystick.button_state[hat  ];
@@ -112,10 +135,15 @@ void joy_hat_handler(SDL_JoyHatEvent *jhe)
 
 int joy_axis_handler(SDL_JoyAxisEvent *jae)
 {
+	int joy_index;
 	int axis;
 	d_event_joystick_moved event;
 
-	axis = SDL_Joysticks[jae->which].axis_map[jae->axis];
+	joy_index = joy_instance_to_index(jae->which);
+	if (joy_index < 0)
+		return 0;
+
+	axis = SDL_Joysticks[joy_index].axis_map[jae->axis];
 
 	// inaccurate stick is inaccurate. SDL might send SDL_JoyAxisEvent even if the value is the same as before.
 	if (Joystick.axis_value[axis] == jae->value/256)
@@ -155,10 +183,15 @@ static int send_axis_button_event(unsigned button, event_type e)
 
 int joy_axisbutton_handler(SDL_JoyAxisEvent *jae)
 {
+	int joy_index;
 	int button;
 	int sent = 0;
 
-	button = SDL_Joysticks[jae->which].axis_button_map[jae->axis];
+	joy_index = joy_instance_to_index(jae->which);
+	if (joy_index < 0)
+		return 0;
+
+	button = SDL_Joysticks[joy_index].axis_button_map[jae->axis];
 
 	// We have to hardcode a deadzone here. It's not mapped into the settings.
 	// We could add another deadzone slider called "axis button deadzone".
@@ -198,6 +231,8 @@ void joy_init()
 		return;
 	}
 
+	SDL_JoystickEventState(SDL_ENABLE);
+
 	memset(&Joystick,0,sizeof(Joystick));
 	memset(joyaxis_text, 0, JOY_MAX_AXES * sizeof(char *));
 	memset(joybutton_text, 0, JOY_MAX_BUTTONS * sizeof(char *));
@@ -206,7 +241,7 @@ void joy_init()
 
 	con_printf(CON_NORMAL, "sdl-joystick: found %d joysticks\n", n);
 	for (i = 0; i < n; i++) {
-		con_printf(CON_NORMAL, "sdl-joystick %d: %s\n", i, SDL_JoystickName(i));
+		con_printf(CON_NORMAL, "sdl-joystick %d: %s\n", i, SDL_JoystickNameForIndex(i));
 		SDL_Joysticks[num_joysticks].handle = SDL_JoystickOpen(i);
 		if (SDL_Joysticks[num_joysticks].handle) {
 

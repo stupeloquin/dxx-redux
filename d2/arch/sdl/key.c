@@ -35,7 +35,7 @@ typedef struct keyboard	{
 static keyboard key_data;
 
 const key_props key_properties[256] = {
-{ "",       255,    SDLK_UNKNOWN                 }, // 0
+{ "",       255,    SDLK_UNKNOWN       }, // 0
 { "ESC",    255,    SDLK_ESCAPE        },
 { "1",      '1',    SDLK_1             },
 { "2",      '2',    SDLK_2             },
@@ -104,194 +104,197 @@ const key_props key_properties[256] = {
 { "F8",     255,    SDLK_F8            },
 { "F9",     255,    SDLK_F9            },
 { "F10",    255,    SDLK_F10           },
-{ "NMLCK",  255,    SDLK_NUMLOCK       },
-{ "SCLK",   255,    SDLK_SCROLLOCK     }, // 70
-{ "PAD7",   255,    SDLK_KP7           },
-{ "PAD8",   255,    SDLK_KP8           },
-{ "PAD9",   255,    SDLK_KP9           },
+{ "NMLCK",  255,    SDLK_NUMLOCKCLEAR  },
+{ "SCLK",   255,    SDLK_SCROLLLOCK    }, // 70
+{ "PAD7",   255,    SDLK_KP_7          },
+{ "PAD8",   255,    SDLK_KP_8          },
+{ "PAD9",   255,    SDLK_KP_9          },
 { "PAD-",   255,    SDLK_KP_MINUS      },
-{ "PAD4",   255,    SDLK_KP4           },
-{ "PAD5",   255,    SDLK_KP5           },
-{ "PAD6",   255,    SDLK_KP6           },
+{ "PAD4",   255,    SDLK_KP_4          },
+{ "PAD5",   255,    SDLK_KP_5          },
+{ "PAD6",   255,    SDLK_KP_6          },
 { "PAD+",   255,    SDLK_KP_PLUS       },
-{ "PAD1",   255,    SDLK_KP1           },
-{ "PAD2",   255,    SDLK_KP2           }, // 80
-{ "PAD3",   255,    SDLK_KP3           },
-{ "PAD0",   255,    SDLK_KP0           },
+{ "PAD1",   255,    SDLK_KP_1          },
+{ "PAD2",   255,    SDLK_KP_2          }, // 80
+{ "PAD3",   255,    SDLK_KP_3          },
+{ "PAD0",   255,    SDLK_KP_0          },
 { "PAD.",   255,    SDLK_KP_PERIOD     },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
 { "F11",    255,    SDLK_F11           },
 { "F12",    255,    SDLK_F12           },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 }, // 90
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       }, // 90
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
 { "PAUSE",  255,    SDLK_PAUSE         },
-{ "W0",     255,    SDLK_WORLD_0       },
-{ "W1",     255,    SDLK_WORLD_1       },
-{ "W2",     255,    SDLK_WORLD_2       }, // 100
-{ "W3",     255,    SDLK_WORLD_3       },
-{ "W4",     255,    SDLK_WORLD_4       },
-{ "W5",     255,    SDLK_WORLD_5       },
-{ "W6",     255,    SDLK_WORLD_6       },
-{ "W7",     255,    SDLK_WORLD_7       },
-{ "W8",     255,    SDLK_WORLD_8       },
-{ "W9",     255,    SDLK_WORLD_9       },
-{ "W10",    255,    SDLK_WORLD_10      },
-{ "W11",    255,    SDLK_WORLD_11      },
-{ "W12",    255,    SDLK_WORLD_12      }, // 110
-{ "W13",    255,    SDLK_WORLD_13      },
-{ "W14",    255,    SDLK_WORLD_14      },
-{ "W15",    255,    SDLK_WORLD_15      },
-{ "W16",    255,    SDLK_WORLD_16      },
-{ "W17",    255,    SDLK_WORLD_17      },
-{ "W18",    255,    SDLK_WORLD_18      },
-{ "W19",    255,    SDLK_WORLD_19      },
-{ "W20",    255,    SDLK_WORLD_20      },
-{ "W21",    255,    SDLK_WORLD_21      },
-{ "W22",    255,    SDLK_WORLD_22      }, // 120
-{ "W23",    255,    SDLK_WORLD_23      },
-{ "W24",    255,    SDLK_WORLD_24      },
-{ "W25",    255,    SDLK_WORLD_25      },
-{ "W26",    255,    SDLK_WORLD_26      },
-{ "W27",    255,    SDLK_WORLD_27      },
-{ "W28",    255,    SDLK_WORLD_28      },
-{ "W29",    255,    SDLK_WORLD_29      },
-{ "W30",    255,    SDLK_WORLD_30      },
-{ "W31",    255,    SDLK_WORLD_31      },
-{ "W32",    255,    SDLK_WORLD_32      }, // 130
-{ "W33",    255,    SDLK_WORLD_33      },
-{ "W34",    255,    SDLK_WORLD_34      },
-{ "W35",    255,    SDLK_WORLD_35      },
-{ "W36",    255,    SDLK_WORLD_36      },
-{ "W37",    255,    SDLK_WORLD_37      },
-{ "W38",    255,    SDLK_WORLD_38      },
-{ "W39",    255,    SDLK_WORLD_39      },
-{ "W40",    255,    SDLK_WORLD_40      },
-{ "W41",    255,    SDLK_WORLD_41      },
-{ "W42",    255,    SDLK_WORLD_42      }, // 140
-{ "W43",    255,    SDLK_WORLD_43      },
-{ "W44",    255,    SDLK_WORLD_44      },
-{ "W45",    255,    SDLK_WORLD_45      },
-{ "W46",    255,    SDLK_WORLD_46      },
-{ "W47",    255,    SDLK_WORLD_47      },
-{ "W48",    255,    SDLK_WORLD_48      },
-{ "W49",    255,    SDLK_WORLD_49      },
-{ "W50",    255,    SDLK_WORLD_50      },
-{ "W51",    255,    SDLK_WORLD_51      },
-{ "",       255,    SDLK_UNKNOWN                 }, // 150
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
+{ "W0",     255,    SDLK_UNKNOWN       },
+{ "W1",     255,    SDLK_UNKNOWN       },
+{ "W2",     255,    SDLK_UNKNOWN       }, // 100
+{ "W3",     255,    SDLK_UNKNOWN       },
+{ "W4",     255,    SDLK_UNKNOWN       },
+{ "W5",     255,    SDLK_UNKNOWN       },
+{ "W6",     255,    SDLK_UNKNOWN       },
+{ "W7",     255,    SDLK_UNKNOWN       },
+{ "W8",     255,    SDLK_UNKNOWN       },
+{ "W9",     255,    SDLK_UNKNOWN       },
+{ "W10",    255,    SDLK_UNKNOWN       },
+{ "W11",    255,    SDLK_UNKNOWN       },
+{ "W12",    255,    SDLK_UNKNOWN       }, // 110
+{ "W13",    255,    SDLK_UNKNOWN       },
+{ "W14",    255,    SDLK_UNKNOWN       },
+{ "W15",    255,    SDLK_UNKNOWN       },
+{ "W16",    255,    SDLK_UNKNOWN       },
+{ "W17",    255,    SDLK_UNKNOWN       },
+{ "W18",    255,    SDLK_UNKNOWN       },
+{ "W19",    255,    SDLK_UNKNOWN       },
+{ "W20",    255,    SDLK_UNKNOWN       },
+{ "W21",    255,    SDLK_UNKNOWN       },
+{ "W22",    255,    SDLK_UNKNOWN       }, // 120
+{ "W23",    255,    SDLK_UNKNOWN       },
+{ "W24",    255,    SDLK_UNKNOWN       },
+{ "W25",    255,    SDLK_UNKNOWN       },
+{ "W26",    255,    SDLK_UNKNOWN       },
+{ "W27",    255,    SDLK_UNKNOWN       },
+{ "W28",    255,    SDLK_UNKNOWN       },
+{ "W29",    255,    SDLK_UNKNOWN       },
+{ "W30",    255,    SDLK_UNKNOWN       },
+{ "W31",    255,    SDLK_UNKNOWN       },
+{ "W32",    255,    SDLK_UNKNOWN       }, // 130
+{ "W33",    255,    SDLK_UNKNOWN       },
+{ "W34",    255,    SDLK_UNKNOWN       },
+{ "W35",    255,    SDLK_UNKNOWN       },
+{ "W36",    255,    SDLK_UNKNOWN       },
+{ "W37",    255,    SDLK_UNKNOWN       },
+{ "W38",    255,    SDLK_UNKNOWN       },
+{ "W39",    255,    SDLK_UNKNOWN       },
+{ "W40",    255,    SDLK_UNKNOWN       },
+{ "W41",    255,    SDLK_UNKNOWN       },
+{ "W42",    255,    SDLK_UNKNOWN       }, // 140
+{ "W43",    255,    SDLK_UNKNOWN       },
+{ "W44",    255,    SDLK_UNKNOWN       },
+{ "W45",    255,    SDLK_UNKNOWN       },
+{ "W46",    255,    SDLK_UNKNOWN       },
+{ "W47",    255,    SDLK_UNKNOWN       },
+{ "W48",    255,    SDLK_UNKNOWN       },
+{ "W49",    255,    SDLK_UNKNOWN       },
+{ "W50",    255,    SDLK_UNKNOWN       },
+{ "W51",    255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       }, // 150
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
 { "PAD\x83",255,    SDLK_KP_ENTER      },
 { "RCTRL",  255,    SDLK_RCTRL         },
-{ "LCMD",   255,    SDLK_LMETA         },
-{ "RCMD",   255,    SDLK_RMETA         },
-{ "",       255,    SDLK_UNKNOWN                 }, // 160
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 }, // 170
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 }, // 180
+{ "LCMD",   255,    SDLK_LGUI          },
+{ "RCMD",   255,    SDLK_RGUI          },
+{ "",       255,    SDLK_UNKNOWN       }, // 160
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       }, // 170
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       }, // 180
 { "PAD/",   255,    SDLK_KP_DIVIDE     },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "PRSCR",  255,    SDLK_PRINT         },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "PRSCR",  255,    SDLK_PRINTSCREEN   },
 { "RALT",   255,    SDLK_RALT          },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 }, // 190
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
-{ "",       255,    SDLK_UNKNOWN                 },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       }, // 190
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
+{ "",       255,    SDLK_UNKNOWN       },
 { "HOME",   255,    SDLK_HOME          },
 { "UP",     255,    SDLK_UP            }, // 200
 { "PGUP",   255,    SDLK_PAGEUP        },
-{ "",       255,    SDLK_UNKNOWN                 },
+{ "",       255,    SDLK_UNKNOWN       },
 { "LEFT",   255,    SDLK_LEFT          },
-{ "",       255,    SDLK_UNKNOWN                 },
+{ "",       255,    SDLK_UNKNOWN       },
 { "RIGHT",  255,    SDLK_RIGHT         },
-{ "",       255,    SDLK_UNKNOWN                 },
+{ "",       255,    SDLK_UNKNOWN       },
 { "END",    255,    SDLK_END           },
 { "DOWN",   255,    SDLK_DOWN          },
 { "PGDN",   255,    SDLK_PAGEDOWN      },
 { "INS",    255,    SDLK_INSERT        }, // 210
 { "DEL",    255,    SDLK_DELETE        },
-{ "W52",    255,    SDLK_WORLD_52      },
-{ "W53",    255,    SDLK_WORLD_53      },
-{ "W54",    255,    SDLK_WORLD_54      },
-{ "W55",    255,    SDLK_WORLD_55      },
-{ "W56",    255,    SDLK_WORLD_56      },
-{ "W57",    255,    SDLK_WORLD_57      },
-{ "W58",    255,    SDLK_WORLD_58      },
-{ "W59",    255,    SDLK_WORLD_59      },
-{ "W60",    255,    SDLK_WORLD_60      }, // 220
-{ "W61",    255,    SDLK_WORLD_61      },
-{ "W62",    255,    SDLK_WORLD_62      },
-{ "W63",    255,    SDLK_WORLD_63      },
-{ "W64",    255,    SDLK_WORLD_64      },
-{ "W65",    255,    SDLK_WORLD_65      },
-{ "W66",    255,    SDLK_WORLD_66      },
-{ "W67",    255,    SDLK_WORLD_67      },
-{ "W68",    255,    SDLK_WORLD_68      },
-{ "W69",    255,    SDLK_WORLD_69      },
-{ "W70",    255,    SDLK_WORLD_70      }, // 230
-{ "W71",    255,    SDLK_WORLD_71      },
-{ "W72",    255,    SDLK_WORLD_72      },
-{ "W73",    255,    SDLK_WORLD_73      },
-{ "W74",    255,    SDLK_WORLD_74      },
-{ "W75",    255,    SDLK_WORLD_75      },
-{ "W76",    255,    SDLK_WORLD_76      },
-{ "W77",    255,    SDLK_WORLD_77      },
-{ "W78",    255,    SDLK_WORLD_78      },
-{ "W79",    255,    SDLK_WORLD_79      },
-{ "W80",    255,    SDLK_WORLD_80      }, // 240
-{ "W81",    255,    SDLK_WORLD_81      },
-{ "W82",    255,    SDLK_WORLD_82      },
-{ "W83",    255,    SDLK_WORLD_83      },
-{ "W84",    255,    SDLK_WORLD_84      },
-{ "W85",    255,    SDLK_WORLD_85      },
-{ "W86",    255,    SDLK_WORLD_86      },
-{ "W87",    255,    SDLK_WORLD_87      },
-{ "W88",    255,    SDLK_WORLD_88      },
-{ "W89",    255,    SDLK_WORLD_89      },
-{ "W90",    255,    SDLK_WORLD_90      }, // 250
-{ "W91",    255,    SDLK_WORLD_91      },
-{ "W92",    255,    SDLK_WORLD_92      },
-{ "W93",    255,    SDLK_WORLD_93      },
-{ "W94",    255,    SDLK_WORLD_94      },
-{ "W95",    255,    SDLK_WORLD_95      }, // 255
+{ "W52",    255,    SDLK_UNKNOWN       },
+{ "W53",    255,    SDLK_UNKNOWN       },
+{ "W54",    255,    SDLK_UNKNOWN       },
+{ "W55",    255,    SDLK_UNKNOWN       },
+{ "W56",    255,    SDLK_UNKNOWN       },
+{ "W57",    255,    SDLK_UNKNOWN       },
+{ "W58",    255,    SDLK_UNKNOWN       },
+{ "W59",    255,    SDLK_UNKNOWN       },
+{ "W60",    255,    SDLK_UNKNOWN       }, // 220
+{ "W61",    255,    SDLK_UNKNOWN       },
+{ "W62",    255,    SDLK_UNKNOWN       },
+{ "W63",    255,    SDLK_UNKNOWN       },
+{ "W64",    255,    SDLK_UNKNOWN       },
+{ "W65",    255,    SDLK_UNKNOWN       },
+{ "W66",    255,    SDLK_UNKNOWN       },
+{ "W67",    255,    SDLK_UNKNOWN       },
+{ "W68",    255,    SDLK_UNKNOWN       },
+{ "W69",    255,    SDLK_UNKNOWN       },
+{ "W70",    255,    SDLK_UNKNOWN       }, // 230
+{ "W71",    255,    SDLK_UNKNOWN       },
+{ "W72",    255,    SDLK_UNKNOWN       },
+{ "W73",    255,    SDLK_UNKNOWN       },
+{ "W74",    255,    SDLK_UNKNOWN       },
+{ "W75",    255,    SDLK_UNKNOWN       },
+{ "W76",    255,    SDLK_UNKNOWN       },
+{ "W77",    255,    SDLK_UNKNOWN       },
+{ "W78",    255,    SDLK_UNKNOWN       },
+{ "W79",    255,    SDLK_UNKNOWN       },
+{ "W80",    255,    SDLK_UNKNOWN       }, // 240
+{ "W81",    255,    SDLK_UNKNOWN       },
+{ "W82",    255,    SDLK_UNKNOWN       },
+{ "W83",    255,    SDLK_UNKNOWN       },
+{ "W84",    255,    SDLK_UNKNOWN       },
+{ "W85",    255,    SDLK_UNKNOWN       },
+{ "W86",    255,    SDLK_UNKNOWN       },
+{ "W87",    255,    SDLK_UNKNOWN       },
+{ "W88",    255,    SDLK_UNKNOWN       },
+{ "W89",    255,    SDLK_UNKNOWN       },
+{ "W90",    255,    SDLK_UNKNOWN       }, // 250
+{ "W91",    255,    SDLK_UNKNOWN       },
+{ "W92",    255,    SDLK_UNKNOWN       },
+{ "W93",    255,    SDLK_UNKNOWN       },
+{ "W94",    255,    SDLK_UNKNOWN       },
+{ "W95",    255,    SDLK_UNKNOWN       }, // 255
 };
+
+
+
 
 typedef struct d_event_keycommand
 {
@@ -325,7 +328,7 @@ unsigned char key_ascii()
 {
 	static unsigned char unibuffer[KEY_BUFFER_SIZE] = { '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0' };
 	int i=0, offset=0, count=0;
-	
+
 	offset=strlen((const char*)unibuffer);
 
 	// move temporal chars from unicode_frame_buffer to empty space behind last unibuffer char (if any)
@@ -357,21 +360,7 @@ void key_handler(SDL_KeyboardEvent *kevent)
 
 	// Read SDLK symbol and state
         event_keysym = kevent->keysym.sym;
-		if (event_keysym == SDLK_UNKNOWN)
-			return;
         key_state = (kevent->state == SDL_PRESSED)?1:0;
-
-	// fill the unicode frame-related unicode buffer 
-	if (key_state && kevent->keysym.unicode > 31 && kevent->keysym.unicode < 255)
-	{
-		int i = 0;
-		for (i = 0; i < KEY_BUFFER_SIZE; i++)
-			if (unicode_frame_buffer[i] == '\0')
-			{
-				unicode_frame_buffer[i] = kevent->keysym.unicode;
-				break;
-			}
-	}
 
 	//=====================================================
 	for (keycode = 255; keycode > 0; keycode--)
@@ -381,7 +370,7 @@ void key_handler(SDL_KeyboardEvent *kevent)
 	if (keycode == 0)
 		return;
 
-	/* 
+	/*
 	 * process the key if:
 	 * - it's a valid key AND
 	 * - if the keystate has changed OR
@@ -437,7 +426,6 @@ void key_init()
 	if (Installed) return;
 
 	Installed=1;
-	SDL_EnableUNICODE(1);
 	key_toggle_repeat(1);
 
 	keyd_time_when_last_pressed = timer_query();
@@ -448,7 +436,7 @@ void key_init()
 void key_flush()
 {
  	int i;
-	Uint8 *keystate = SDL_GetKeyState(NULL);
+	const Uint8 *keystate = SDL_GetKeyboardState(NULL);
 
 	if (!Installed)
 		key_init();
@@ -458,7 +446,7 @@ void key_flush()
 		unicode_frame_buffer[i] = '\0';
 
 	for (i=0; i<256; i++ )	{
-		if (key_ismodlck(i) == KEY_ISLCK && keystate[key_properties[i].sym] && !GameArg.CtlNoStickyKeys) // do not flush status of sticky keys
+		if (key_ismodlck(i) == KEY_ISLCK && keystate[SDL_GetScancodeFromKey(key_properties[i].sym)] && !GameArg.CtlNoStickyKeys) // do not flush status of sticky keys
 		{
 			keyd_pressed[i] = 1;
 			key_data.state[i] = 0;
@@ -492,15 +480,6 @@ int event_key_get_raw(d_event *event)
 
 void key_toggle_repeat(int enable)
 {
-	if (enable)
-	{
-		if (SDL_EnableKeyRepeat(KEY_REPEAT_DELAY, KEY_REPEAT_INTERVAL) == 0)
-			keyd_repeat = 1;
-	}
-	else
-	{
-		SDL_EnableKeyRepeat(0, 0);
-		keyd_repeat = 0;
-	}
+	keyd_repeat = enable;
 	key_flush();
 }

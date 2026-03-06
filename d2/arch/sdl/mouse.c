@@ -49,7 +49,7 @@ void mouse_close(void)
 void mouse_button_handler(SDL_MouseButtonEvent *mbe)
 {
 	// to bad, SDL buttons use a different mapping as descent expects,
-	// this is at least true and tested for the first three buttons 
+	// this is at least true and tested for the first three buttons
 	int button_remap[17] = {
 		MBTN_LEFT,
 		MBTN_MIDDLE,
@@ -70,46 +70,32 @@ void mouse_button_handler(SDL_MouseButtonEvent *mbe)
 		MBTN_16
 	};
 
-	int button = button_remap[mbe->button - 1]; // -1 since SDL seems to start counting at 1
+	int button;
 	d_event_mousebutton event;
 
 	if (GameArg.CtlNoMouse)
 		return;
 
+	if (mbe->button < 1 || mbe->button > 16)
+		return;
+
+	button = button_remap[mbe->button - 1]; // -1 since SDL seems to start counting at 1
+
 	Mouse.cursor_time = timer_query();
 
 	if (mbe->state == SDL_PRESSED) {
-		d_event_mouse_moved event2 = { EVENT_MOUSE_MOVED, 0, 0, 0 };
-
 		Mouse.button_state[button] = 1;
-
-		if (button == MBTN_Z_UP) {
-			Mouse.delta_z += Z_SENSITIVITY;
-			Mouse.z += Z_SENSITIVITY;
-			event2.dz = Z_SENSITIVITY;
-		} else if (button == MBTN_Z_DOWN) {
-			Mouse.delta_z -= Z_SENSITIVITY;
-			Mouse.z -= Z_SENSITIVITY;
-			event2.dz = -1*Z_SENSITIVITY;
-		}
-		
-		if (event2.dz)
-		{
-			//con_printf(CON_DEBUG, "Sending event EVENT_MOUSE_MOVED, relative motion %d,%d,%d\n",
-			//		   event2.dx, event2.dy, event2.dz);
-			event_send((d_event *)&event2);
-		}
 	} else {
 		Mouse.button_state[button] = 0;
 	}
-	
+
 	event.type = (mbe->state == SDL_PRESSED) ? EVENT_MOUSE_BUTTON_DOWN : EVENT_MOUSE_BUTTON_UP;
 	event.button = button;
-	
+
 	con_printf(CON_DEBUG, "Sending event %s, button %d, coords %d,%d,%d\n",
 			   (mbe->state == SDL_PRESSED) ? "EVENT_MOUSE_BUTTON_DOWN" : "EVENT_MOUSE_BUTTON_UP", event.button, Mouse.x, Mouse.y, Mouse.z);
 	event_send((d_event *)&event);
-	
+
 	//Double-click support
 	if (Mouse.button_state[button])
 	{
@@ -126,6 +112,42 @@ void mouse_button_handler(SDL_MouseButtonEvent *mbe)
 	}
 }
 
+void mouse_wheel_handler(SDL_MouseWheelEvent *whe)
+{
+	d_event_mouse_moved event2 = { EVENT_MOUSE_MOVED, 0, 0, 0 };
+	d_event_mousebutton event;
+
+	Mouse.cursor_time = timer_query();
+
+	if (whe->y > 0) {
+		Mouse.delta_z += Z_SENSITIVITY;
+		Mouse.z += Z_SENSITIVITY;
+		event2.dz = Z_SENSITIVITY;
+	} else if (whe->y < 0) {
+		Mouse.delta_z -= Z_SENSITIVITY;
+		Mouse.z -= Z_SENSITIVITY;
+		event2.dz = -Z_SENSITIVITY;
+	}
+	if (event2.dz) {
+		event_send((d_event *)&event2);
+	}
+
+	// Also send button down/up for scroll compatibility
+	if (whe->y > 0) {
+		event.type = EVENT_MOUSE_BUTTON_DOWN;
+		event.button = MBTN_Z_UP;
+		event_send((d_event *)&event);
+		event.type = EVENT_MOUSE_BUTTON_UP;
+		event_send((d_event *)&event);
+	} else if (whe->y < 0) {
+		event.type = EVENT_MOUSE_BUTTON_DOWN;
+		event.button = MBTN_Z_DOWN;
+		event_send((d_event *)&event);
+		event.type = EVENT_MOUSE_BUTTON_UP;
+		event_send((d_event *)&event);
+	}
+}
+
 void mouse_motion_handler(SDL_MouseMotionEvent *mme)
 {
 	d_event_mouse_moved event;
@@ -133,15 +155,15 @@ void mouse_motion_handler(SDL_MouseMotionEvent *mme)
 	Mouse.cursor_time = timer_query();
 	Mouse.x += mme->xrel;
 	Mouse.y += mme->yrel;
-	
+
 	event.type = EVENT_MOUSE_MOVED;
 	event.dx = mme->xrel;
 	event.dy = mme->yrel;
-	event.dz = 0;		// handled in mouse_button_handler
-	
+	event.dz = 0;		// handled in mouse_wheel_handler
+
 	Mouse.old_delta_x = event.dx;
 	Mouse.old_delta_y = event.dy;
-	
+
 	//con_printf(CON_DEBUG, "Sending event EVENT_MOUSE_MOVED, relative motion %d,%d,%d\n",
 	//		   event.dx, event.dy, event.dz);
 	event_send((d_event *)&event);
@@ -178,11 +200,11 @@ void mouse_get_pos( int *x, int *y, int *z )
 int mouse_in_window(window *wind)
 {
 	grs_canvas *canv;
-	
+
 	canv = window_get_canvas(wind);
 	return	(Mouse.x >= canv->cv_bitmap.bm_x) &&
-			(Mouse.x <= canv->cv_bitmap.bm_x + canv->cv_bitmap.bm_w) && 
-			(Mouse.y >= canv->cv_bitmap.bm_y) && 
+			(Mouse.x <= canv->cv_bitmap.bm_x + canv->cv_bitmap.bm_w) &&
+			(Mouse.y >= canv->cv_bitmap.bm_y) &&
 			(Mouse.y <= canv->cv_bitmap.bm_y + canv->cv_bitmap.bm_h);
 }
 

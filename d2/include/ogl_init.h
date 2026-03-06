@@ -11,26 +11,27 @@
 #include <stddef.h>
 #endif
 
-#include <GL/glew.h>
-#ifdef _WIN32
-#include "loadgl.h"
-int ogl_init_load_library(void);
+#ifdef OGLES
+# include <GLES/gl.h>
 #else
-# define GL_GLEXT_LEGACY
-# if defined(__APPLE__) && defined(__MACH__)
-#  include <OpenGL/gl.h>
-#  include <OpenGL/glu.h>
+# include <GL/glew.h>
+# ifdef _WIN32
+#  include "loadgl.h"
+int ogl_init_load_library(void);
 # else
-#  define GL_GLEXT_PROTOTYPES
-#  ifdef OGLES
-#  include <GLES/gl.h>
+#  define GL_GLEXT_LEGACY
+#  if defined(__APPLE__) && defined(__MACH__)
+#   include <OpenGL/gl.h>
+#   include <OpenGL/glu.h>
 #  else
-#  include <GL/gl.h>
+#   define GL_GLEXT_PROTOTYPES
+#   include <GL/gl.h>
 #  endif
 # endif
-# ifndef GL_CLAMP_TO_EDGE	// hack for Mac OS 9, others?
-#  define GL_CLAMP_TO_EDGE GL_CLAMP
-# endif
+#endif
+
+#ifndef GL_CLAMP_TO_EDGE
+# define GL_CLAMP_TO_EDGE 0x812F
 #endif
 
 #include "gr.h"
