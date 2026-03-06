@@ -16,6 +16,9 @@
 #include "args.h"
 
 #include "joy.h"
+#ifdef __ANDROID__
+#include "touch.h"
+#endif
 
 extern SDL_Window *sdl_window;
 
@@ -38,6 +41,12 @@ void event_poll()
 	// like pressing 'Return' really fast at 'Difficulty Level' causing multiple games to be started
 	while ((wind == window_get_front()) && SDL_PollEvent(&event))
 	{
+#ifdef __ANDROID__
+		if (touch_overlay_process_event(&event)) {
+			idle = 0;
+			continue;
+		}
+#endif
 		switch(event.type) {
 			case SDL_KEYDOWN:
 			case SDL_KEYUP:
@@ -133,6 +142,10 @@ int event_init()
 	// We should now be active and responding to events.
 	initialised = 1;
 
+#ifdef __ANDROID__
+	touch_overlay_init();
+#endif
+
 	return 0;
 }
 
@@ -180,6 +193,13 @@ void event_process(void)
 	window *wind = window_get_front();
 
 	timer_update();
+
+#ifdef __ANDROID__
+	{
+		extern window *Game_wind;
+		touch_overlay_set_game_mode(Game_wind != NULL);
+	}
+#endif
 
 	event_poll();	// send input events first
 

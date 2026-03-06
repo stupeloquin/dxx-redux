@@ -38,6 +38,13 @@ void arch_init(void)
 {
 	int t;
 
+#ifdef __ANDROID__
+	/* Disable SDL's automatic touch-to-mouse conversion.
+	 * The touch overlay handles all touch input and injects
+	 * mouse/key events explicitly. Must be set before SDL_Init. */
+	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+	SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
+#endif
 	if (SDL_Init(SDL_INIT_VIDEO) < 0)
 		Error("SDL library initialisation failed: %s.",SDL_GetError());
 

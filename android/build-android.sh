@@ -302,13 +302,16 @@ chmod +x $ANDROID_PROJECT/gradlew
 # ============================================================
 # Step 7: Build the APK
 # ============================================================
-# Generate debug keystore if missing
-if [ ! -f $ANDROID_PROJECT/debug.keystore ]; then
-    keytool -genkey -v -keystore $ANDROID_PROJECT/debug.keystore \
+# Use persistent debug keystore from source tree (survives container restarts)
+PERSISTENT_KEYSTORE=$DXX_ROOT/android/debug.keystore
+if [ ! -f "$PERSISTENT_KEYSTORE" ]; then
+    echo "=== Generating persistent debug keystore ==="
+    keytool -genkey -v -keystore "$PERSISTENT_KEYSTORE" \
         -storepass android -alias androiddebugkey -keypass android \
         -keyalg RSA -keysize 2048 -validity 10000 \
         -dname "CN=Android Debug,O=Android,C=US"
 fi
+cp "$PERSISTENT_KEYSTORE" $ANDROID_PROJECT/debug.keystore
 
 echo "=== Building APK ==="
 cd $ANDROID_PROJECT
@@ -316,3 +319,11 @@ cd $ANDROID_PROJECT
 
 echo "=== Build Complete ==="
 ls -la $ANDROID_PROJECT/app/build/outputs/apk/debug/ 2>/dev/null || echo "APK not found - build may have failed"
+
+# Copy APK to the mounted source tree so it's accessible after container exits
+APK_SRC="$ANDROID_PROJECT/app/build/outputs/apk/debug/app-debug.apk"
+APK_DST="$DXX_ROOT/android/${DXX_GAME}-debug.apk"
+if [ -f "$APK_SRC" ]; then
+    cp "$APK_SRC" "$APK_DST"
+    echo "=== APK copied to android/${DXX_GAME}-debug.apk ==="
+fi

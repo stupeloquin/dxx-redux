@@ -84,7 +84,11 @@ void read_observer_setting(int obs_mode, char *line, char *word);
 int new_player_config()
 {
 	InitWeaponOrdering (); //setup default weapon priorities
+#ifdef __ANDROID__
+	PlayerCfg.ControlType=2; // CONTROL_USING_MOUSE - touch overlay uses mouse for aiming/firing
+#else
 	PlayerCfg.ControlType=0; // Assume keyboard
+#endif
 	memcpy(PlayerCfg.KeySettings, DefaultKeySettings, sizeof(DefaultKeySettings));
 	memcpy(PlayerCfg.KeySettingsD2X, DefaultKeySettingsD2X, sizeof(DefaultKeySettingsD2X));
 	kc_set_controls();
@@ -990,6 +994,11 @@ int read_player_file()
 	strcat(filename, ".plx");
 	read_player_d2x(filename);
 	kc_set_controls();
+
+#ifdef __ANDROID__
+	/* Force mouse enabled on Android - touch overlay relies on it */
+	PlayerCfg.ControlType |= 2; /* CONTROL_USING_MOUSE */
+#endif
 
 	return EZERO;
 

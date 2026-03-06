@@ -41,7 +41,16 @@ void PHYSFSX_init(int argc, char *argv[])
 	int bundle = 0;
 #endif
 	
+#ifdef __ANDROID__
+	{
+		PHYSFS_AndroidInit ainit;
+		ainit.jnienv = SDL_AndroidGetJNIEnv();
+		ainit.context = SDL_AndroidGetActivity();
+		PHYSFS_init((const char *) &ainit);
+	}
+#else
 	PHYSFS_init(argv[0]);
+#endif
 	PHYSFS_permitSymbolicLinks(1);
 	base_dir = strdup(PHYSFS_getBaseDir());
 

@@ -125,6 +125,11 @@ set(SRC_MISC
     ${DXX_SRC}/misc/strutil.c
 )
 
+# physfsrwops.c only exists in d2
+if(EXISTS "${DXX_SRC}/misc/physfsrwops.c")
+    list(APPEND SRC_MISC ${DXX_SRC}/misc/physfsrwops.c)
+endif()
+
 # --------------------------------------------------------------------------
 # Source files: texmap library
 # --------------------------------------------------------------------------
@@ -263,9 +268,12 @@ endif()
 # --------------------------------------------------------------------------
 # xmodel stub (xmodel requires GLEW/GL2.0+, not available on GLES 1.x)
 # --------------------------------------------------------------------------
+set(DXX_ANDROID_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../dxx-redux/android")
+
 set(SRC_ANDROID_STUBS
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../dxx-redux/android/xmodel_stub.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../dxx-redux/android/messagebox.c
+    ${DXX_ANDROID_DIR}/xmodel_stub.c
+    ${DXX_ANDROID_DIR}/messagebox.c
+    ${DXX_ANDROID_DIR}/touch.c
 )
 
 # --------------------------------------------------------------------------
@@ -296,6 +304,7 @@ target_include_directories(main PRIVATE
     ${SDL2_SOURCE_DIR}/include
     ${SDL2_MIXER_SOURCE_DIR}/include
     ${PHYSFS_INCLUDE_DIR}
+    ${DXX_ANDROID_DIR}
 )
 
 # --------------------------------------------------------------------------

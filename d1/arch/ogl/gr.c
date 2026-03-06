@@ -83,7 +83,9 @@ int ogl_init_window(int x, int y)
 		ogl_smash_texture_list_internal();
 
 	if (sdl_window) {
+#ifndef __ANDROID__
 		SDL_SetWindowSize(sdl_window, x, y);
+#endif
 		SDL_SetWindowTitle(sdl_window, DESCENT_VERSION);
 	} else {
 		use_flags |= SDL_WINDOW_OPENGL;
@@ -286,6 +288,25 @@ int gr_set_mode(u_int32_t mode)
 		Game_screen_mode=mode=SM(w,h);
 	}
 
+#ifdef __ANDROID__
+	/* On Android, always use native display resolution */
+	{
+		SDL_DisplayMode dm;
+		if (sdl_window) {
+			int real_w, real_h;
+			SDL_GetWindowSize(sdl_window, &real_w, &real_h);
+			if (real_w > 0 && real_h > 0) {
+				w = real_w;
+				h = real_h;
+			}
+		} else if (SDL_GetCurrentDisplayMode(0, &dm) == 0) {
+			w = dm.w;
+			h = dm.h;
+		}
+		Game_screen_mode = mode = SM(w, h);
+	}
+#endif
+
 	gr_bm_data=(char *)grd_curscreen->sc_canvas.cv_bitmap.bm_data;//since we use realloc, we want to keep this pointer around.
 	memset( grd_curscreen, 0, sizeof(grs_screen));
 	grd_curscreen->sc_mode = mode;
@@ -299,6 +320,7 @@ int gr_set_mode(u_int32_t mode)
 
 	ogl_init_window(w,h);//platform specific code
 	ogl_get_verinfo();
+
 	OGL_VIEWPORT(0,0,w,h);
 	ogl_init_state();
 	gamefont_choose_game_font(w,h);
@@ -387,11 +409,15 @@ int gr_init(int mode)
 	ogl_init_load_library();
 #endif
 
+#ifdef __ANDROID__
+	sdl_video_flags|=SDL_WINDOW_FULLSCREEN;
+#else
 	if (!GameCfg.WindowMode && !GameArg.SysWindow)
 		sdl_video_flags|=SDL_WINDOW_FULLSCREEN;
 
 	if (GameArg.SysNoBorders)
 		sdl_video_flags|=SDL_WINDOW_BORDERLESS;
+#endif
 
 	gr_set_attributes();
 

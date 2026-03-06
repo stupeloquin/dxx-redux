@@ -1193,6 +1193,12 @@ void gr_flip(void)
 		ogl_texture_stats();
 
 	ogl_do_palfx();
+#ifdef __ANDROID__
+	{
+		extern void touch_overlay_draw(int w, int h);
+		touch_overlay_draw(grd_curscreen->sc_w, grd_curscreen->sc_h);
+	}
+#endif
 	ogl_swap_buffers_internal();
 	glClear(GL_COLOR_BUFFER_BIT);
 }

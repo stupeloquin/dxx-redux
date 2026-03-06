@@ -69,7 +69,11 @@ int new_player_config()
 		saved_games[i].name[0] = 0;
 
 	InitWeaponOrdering (); //setup default weapon priorities
+#ifdef __ANDROID__
+	PlayerCfg.ControlType=2; // CONTROL_USING_MOUSE - touch overlay uses mouse for aiming/firing
+#else
 	PlayerCfg.ControlType=0; // Assume keyboard
+#endif
 	memcpy(PlayerCfg.KeySettings, DefaultKeySettings, sizeof(DefaultKeySettings));
 	memcpy(PlayerCfg.KeySettingsD1X, DefaultKeySettingsD1X, sizeof(DefaultKeySettingsD1X));
 	kc_set_controls();
@@ -1193,6 +1197,11 @@ int read_player_file()
 	strcat(filename, ".plx");
 	read_player_d1x(filename);
 	kc_set_controls();
+
+#ifdef __ANDROID__
+	/* Force mouse enabled on Android - touch overlay relies on it */
+	PlayerCfg.ControlType |= 2; /* CONTROL_USING_MOUSE */
+#endif
 
 	return EZERO;
 
