@@ -112,6 +112,43 @@ else
 fi
 
 # ============================================================
+# Step 3b: Cross-compile libADLMIDI for Android (OPL3 MIDI synthesizer)
+# ============================================================
+echo "=== Cross-compiling libADLMIDI ==="
+ADLMIDI_INSTALL=$ANDROID_PROJECT/app/src/main/jniLibs/${TARGET_ABI:-x86_64}
+
+if [ ! -f $ADLMIDI_INSTALL/libADLMIDI.so ]; then
+    if [ ! -d $DEPS/libADLMIDI-1.5.1 ]; then
+        echo "Downloading libADLMIDI..."
+        wget -q https://github.com/Wohlstand/libADLMIDI/archive/refs/tags/v1.5.1.tar.gz -O $DEPS/libADLMIDI-1.5.1.tar.gz
+        cd $DEPS && tar xzf libADLMIDI-1.5.1.tar.gz
+    fi
+
+    ADLMIDI_BUILD=/tmp/adlmidi-build-android
+    mkdir -p $ADLMIDI_BUILD $ADLMIDI_INSTALL
+    cd $ADLMIDI_BUILD
+    $ANDROID_HOME/cmake/3.28.3/bin/cmake \
+        -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+        -DANDROID_ABI=${TARGET_ABI:-x86_64} \
+        -DANDROID_PLATFORM=android-24 \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DlibADLMIDI_STATIC=OFF \
+        -DlibADLMIDI_SHARED=ON \
+        -DWITH_EMBEDDED_BANKS=ON \
+        -DWITH_GENADLDATA=OFF \
+        -DWITH_MIDIPLAY=OFF \
+        -DWITH_VLC_PLUGIN=OFF \
+        -DWITH_OLD_UTILS=OFF \
+        -DEXAMPLE_SDL2_AUDIO=OFF \
+        $DEPS/libADLMIDI-1.5.1
+    make -j$(nproc)
+    cp libADLMIDI.so $ADLMIDI_INSTALL/
+    echo "libADLMIDI installed to $ADLMIDI_INSTALL"
+else
+    echo "libADLMIDI already built, skipping"
+fi
+
+# ============================================================
 # Step 4: Configure Android project build files
 # ============================================================
 echo "=== Configuring Android project ==="
@@ -284,6 +321,23 @@ sed -i "s/^package com\.dxxredux\.d1x;/package $DXX_PACKAGE;/" \
 echo "=== Creating CMakeLists.txt ==="
 mkdir -p $ANDROID_PROJECT/app/jni/src
 cp $DXX_ROOT/android/CMakeLists.android.txt $ANDROID_PROJECT/app/jni/src/CMakeLists.txt
+
+# ============================================================
+# Step 5b: Generate launcher icons from game 3D model
+# ============================================================
+echo "=== Generating launcher icons ==="
+ICON_RES_DIR=$ANDROID_PROJECT/app/src/main/res
+PIG_FILE=${PIG_FILE:-/build/game-data/descent.pig}
+if [ -f "$PIG_FILE" ]; then
+    D2_FLAG=""
+    if [ "$DXX_GAME" = "d2x" ]; then
+        D2_FLAG="--d2"
+    fi
+    python3 $DXX_ROOT/android/gen_icon.py $D2_FLAG "$PIG_FILE" "$ICON_RES_DIR"
+else
+    echo "WARNING: $PIG_FILE not found, skipping icon generation"
+    echo "  Mount game data with -v /path/to/data:/build/game-data"
+fi
 
 # ============================================================
 # Step 6: Set up Gradle wrapper

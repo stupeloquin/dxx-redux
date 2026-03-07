@@ -105,7 +105,7 @@ enum MENUS
     MENU_JOIN_MANUAL_UDP_NETGAME,
     MENU_JOIN_LIST_UDP_NETGAME,
     #endif
-    #ifndef RELEASE
+    #if !defined(RELEASE) && !defined(__ANDROID__)
     MENU_SANDBOX
     #endif
 };
@@ -496,7 +496,9 @@ void create_main_menu(newmenu_item *m, int *menu_choice, int *callers_num_option
 		ADD_ITEM("  Editor", MENU_EDITOR, KEY_E);
 		#endif
 	}
+	#ifndef __ANDROID__
 	ADD_ITEM("  SANDBOX", MENU_SANDBOX, -1);
+	#endif
 	#endif
 
 	*callers_num_options = num_options;
@@ -601,7 +603,7 @@ int do_option ( int select)
 		case MENU_SHOW_CREDITS:
 			credits_show(NULL);
 			break;
-#ifndef RELEASE
+#if !defined(RELEASE) && !defined(__ANDROID__)
 		case MENU_SANDBOX:
 			do_sandbox_menu();
 			break;
@@ -1067,7 +1069,7 @@ void input_config_sensitivity()
 	PlayerCfg.MouseImpulse = m[mouseimpulse].value; /* Old School Mouse */ 
 }
 
-static int opt_ic_usejoy = 0, opt_ic_usemouse = 0, opt_ic_confkey = 0, opt_ic_confjoy = 0, opt_ic_confmouse = 0, opt_ic_confweap = 0, opt_ic_mouseflightsim = 0, opt_ic_joymousesens = 0, opt_ic_grabinput = 0, opt_ic_mousefsgauge = 0, opt_ic_stickyrear = 0, opt_ic_help0 = 0, opt_ic_help1 = 0, opt_ic_help2 = 0;
+static int opt_ic_usejoy = 0, opt_ic_usemouse = 0, opt_ic_usegyro = -1, opt_ic_confkey = 0, opt_ic_confjoy = 0, opt_ic_confmouse = 0, opt_ic_confweap = 0, opt_ic_mouseflightsim = 0, opt_ic_joymousesens = 0, opt_ic_grabinput = 0, opt_ic_mousefsgauge = 0, opt_ic_stickyrear = 0, opt_ic_help0 = 0, opt_ic_help1 = 0, opt_ic_help2 = 0;
 int input_config_menuset(newmenu *menu, d_event *event, void *userdata)
 {
 	newmenu_item *items = newmenu_get_items(menu);
@@ -1082,6 +1084,8 @@ int input_config_menuset(newmenu *menu, d_event *event, void *userdata)
 				(items[citem].value)?(PlayerCfg.ControlType|=CONTROL_USING_JOYSTICK):(PlayerCfg.ControlType&=~CONTROL_USING_JOYSTICK);
 			if (citem == opt_ic_usemouse)
 				(items[citem].value)?(PlayerCfg.ControlType|=CONTROL_USING_MOUSE):(PlayerCfg.ControlType&=~CONTROL_USING_MOUSE);
+			if (opt_ic_usegyro >= 0 && citem == opt_ic_usegyro)
+				PlayerCfg.UseGyro = items[citem].value;
 			/* Old School Mouse */
 			if (citem == opt_ic_mouseflightsim)
 				PlayerCfg.MouseControlStyle = MOUSE_CONTROL_REBIRTH;
@@ -1126,13 +1130,19 @@ int input_config_menuset(newmenu *menu, d_event *event, void *userdata)
 
 void input_config()
 {
-	newmenu_item m[23];
+	newmenu_item m[24];
 	int nitems = 0;
 
 	opt_ic_usejoy = nitems;
 	m[nitems].type = NM_TYPE_CHECK; m[nitems].text = "USE JOYSTICK"; m[nitems].value = (PlayerCfg.ControlType&CONTROL_USING_JOYSTICK); nitems++;
 	opt_ic_usemouse = nitems;
 	m[nitems].type = NM_TYPE_CHECK; m[nitems].text = "USE MOUSE"; m[nitems].value = (PlayerCfg.ControlType&CONTROL_USING_MOUSE); nitems++;
+#ifdef __ANDROID__
+	opt_ic_usegyro = nitems;
+	m[nitems].type = NM_TYPE_CHECK; m[nitems].text = "USE GYROSCOPE"; m[nitems].value = PlayerCfg.UseGyro; nitems++;
+#else
+	opt_ic_usegyro = -1;
+#endif
 	m[nitems].type = NM_TYPE_TEXT; m[nitems].text = ""; nitems++;
 	opt_ic_confkey = nitems;
 	m[nitems].type = NM_TYPE_MENU; m[nitems].text = "CUSTOMIZE KEYBOARD"; nitems++;

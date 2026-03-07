@@ -247,6 +247,24 @@ void joy_init()
 		SDL_Joysticks[num_joysticks].handle = SDL_JoystickOpen(i);
 		if (SDL_Joysticks[num_joysticks].handle) {
 
+#ifdef __ANDROID__
+			/* Skip sensor-only devices (accelerometer, gyroscope) that have
+			 * no buttons or hats — they interfere with gameplay.
+			 * Allow them through when gyroscope control is enabled. */
+			{
+				int probe_buttons = SDL_JoystickNumButtons(SDL_Joysticks[num_joysticks].handle);
+				int probe_hats = SDL_JoystickNumHats(SDL_Joysticks[num_joysticks].handle);
+				if (probe_buttons == 0 && probe_hats == 0 && !PlayerCfg.UseGyro)
+				{
+					con_printf(CON_NORMAL, "sdl-joystick %d: skipping sensor device (0 buttons, %d axes)\n",
+						i, SDL_JoystickNumAxes(SDL_Joysticks[num_joysticks].handle));
+					SDL_JoystickClose(SDL_Joysticks[num_joysticks].handle);
+					SDL_Joysticks[num_joysticks].handle = NULL;
+					continue;
+				}
+			}
+#endif
+
 			SDL_Joysticks[num_joysticks].n_axes
 				= SDL_JoystickNumAxes(SDL_Joysticks[num_joysticks].handle);
 			if(SDL_Joysticks[num_joysticks].n_axes > MAX_AXES_PER_JOYSTICK)

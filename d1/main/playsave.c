@@ -70,12 +70,35 @@ int new_player_config()
 
 	InitWeaponOrdering (); //setup default weapon priorities
 #ifdef __ANDROID__
-	PlayerCfg.ControlType=2; // CONTROL_USING_MOUSE - touch overlay uses mouse for aiming/firing
+	PlayerCfg.ControlType=3; // CONTROL_USING_JOYSTICK | CONTROL_USING_MOUSE
 #else
 	PlayerCfg.ControlType=0; // Assume keyboard
 #endif
 	memcpy(PlayerCfg.KeySettings, DefaultKeySettings, sizeof(DefaultKeySettings));
 	memcpy(PlayerCfg.KeySettingsD1X, DefaultKeySettingsD1X, sizeof(DefaultKeySettingsD1X));
+
+#ifdef __ANDROID__
+	/* Modern dual-stick gamepad layout for Android:
+	 * Left stick: move/strafe, Right stick: look/aim
+	 * R1=fire, L1=secondary, A=flare, B=bomb, Y=rear, X=automap
+	 * SDL2 Android gamepad axes: 0=LX, 1=LY, 2=RX, 3=RY
+	 * SDL2 Android gamepad buttons: 0=A, 1=B, 2=X, 3=Y, 4=L1, 5=R1 */
+	PlayerCfg.KeySettings[1][0]  = 5;    /* Fire primary   = R1 */
+	PlayerCfg.KeySettings[1][1]  = 4;    /* Fire secondary = L1 */
+	PlayerCfg.KeySettings[1][4]  = 0;    /* Fire flare     = A  */
+	PlayerCfg.KeySettings[1][13] = 3;    /* Pitch U/D axis = Right stick Y */
+	PlayerCfg.KeySettings[1][14] = 0;    /* Pitch not inverted (up=up) */
+	PlayerCfg.KeySettings[1][15] = 2;    /* Turn L/R axis  = Right stick X */
+	PlayerCfg.KeySettings[1][16] = 0;    /* Turn not inverted */
+	PlayerCfg.KeySettings[1][17] = 0;    /* Slide L/R axis = Left stick X */
+	PlayerCfg.KeySettings[1][18] = 0;    /* Slide not inverted */
+	PlayerCfg.KeySettings[1][23] = 1;    /* Throttle axis  = Left stick Y */
+	PlayerCfg.KeySettings[1][24] = 0;    /* Throttle not inverted (up=fwd) */
+	PlayerCfg.KeySettings[1][25] = 3;    /* Rear view      = Y  */
+	PlayerCfg.KeySettings[1][26] = 1;    /* Drop bomb      = B  */
+	PlayerCfg.KeySettings[1][27] = 2;    /* Automap        = X  */
+#endif
+
 	kc_set_controls();
 
 	PlayerCfg.DefaultDifficulty = 1;
@@ -85,7 +108,11 @@ int new_player_config()
 	PlayerCfg.HighestLevels[0].LevelNum = 1; //was highest level in old struct
 	PlayerCfg.KeyboardSens[0] = PlayerCfg.KeyboardSens[1] = PlayerCfg.KeyboardSens[2] = PlayerCfg.KeyboardSens[3] = PlayerCfg.KeyboardSens[4] = 16;
 	PlayerCfg.JoystickSens[0] = PlayerCfg.JoystickSens[1] = PlayerCfg.JoystickSens[2] = PlayerCfg.JoystickSens[3] = PlayerCfg.JoystickSens[4] = PlayerCfg.JoystickSens[5] = 8;
+#ifdef __ANDROID__
+	PlayerCfg.JoystickDead[0] = PlayerCfg.JoystickDead[1] = PlayerCfg.JoystickDead[2] = PlayerCfg.JoystickDead[3] = PlayerCfg.JoystickDead[4] = PlayerCfg.JoystickDead[5] = 4;
+#else
 	PlayerCfg.JoystickDead[0] = PlayerCfg.JoystickDead[1] = PlayerCfg.JoystickDead[2] = PlayerCfg.JoystickDead[3] = PlayerCfg.JoystickDead[4] = PlayerCfg.JoystickDead[5] = 0;
+#endif
 	PlayerCfg.JoystickUndercalibrate[0] = PlayerCfg.JoystickUndercalibrate[1] = PlayerCfg.JoystickUndercalibrate[2] = PlayerCfg.JoystickUndercalibrate[3] = PlayerCfg.JoystickUndercalibrate[4] = PlayerCfg.JoystickUndercalibrate[5] = 0;
 	PlayerCfg.MouseControlStyle = MOUSE_CONTROL_REBIRTH; /* Old School Mouse */
 	PlayerCfg.MouseImpulse = 8;
@@ -111,7 +138,8 @@ int new_player_config()
 	PlayerCfg.AlphaEffects = 0;
 	PlayerCfg.DynLightColor = 0;
 	PlayerCfg.DisableCockpit = 0;  /* DisableCockpit */ 
-	PlayerCfg.StickyRearview = 0; /* StickyRearview */ 
+	PlayerCfg.StickyRearview = 0; /* StickyRearview */
+	PlayerCfg.UseGyro = 0;
 	PlayerCfg.SelectAfterFire = 1;  /* SelectAfterFire */
 	PlayerCfg.VulcanAmmoWarnings = 1; 
 	PlayerCfg.ShieldWarnings = 0; 
@@ -433,7 +461,9 @@ int read_player_d1x(char *filename)
 				if(!strcmp(word,"DISABLECOCKPIT"))
 					PlayerCfg.DisableCockpit = atoi(line); /* DisableCockpit */ 
 				if(!strcmp(word,"STICKYREARVIEW"))
-					PlayerCfg.StickyRearview = atoi(line); /* StickyRearview */ 
+					PlayerCfg.StickyRearview = atoi(line); /* StickyRearview */
+				if(!strcmp(word,"USEGYRO"))
+					PlayerCfg.UseGyro = atoi(line);
 				if(!strcmp(word,"SELECTAFTERFIRE"))
 					PlayerCfg.SelectAfterFire = atoi(line); /* SelectAfterFire */ 										
 				if(!strcmp(word,"NOFIREAUTOSELECT"))
@@ -911,7 +941,8 @@ int write_player_d1x(char *filename)
 		PHYSFSX_printf(fout,"bombgauge=%i\n",PlayerCfg.BombGauge);
 		PHYSFSX_printf(fout,"automapfreeflight=%i\n",PlayerCfg.AutomapFreeFlight);
 		PHYSFSX_printf(fout,"disablecockpit=%i\n",PlayerCfg.DisableCockpit); /* DisableCockpit */ 
-		PHYSFSX_printf(fout,"stickyrearview=%i\n",PlayerCfg.StickyRearview); /* StickyRearview */ 
+		PHYSFSX_printf(fout,"stickyrearview=%i\n",PlayerCfg.StickyRearview); /* StickyRearview */
+		PHYSFSX_printf(fout,"usegyro=%i\n",PlayerCfg.UseGyro);
 		PHYSFSX_printf(fout,"selectafterfire=%i\n",PlayerCfg.SelectAfterFire); /* SelectAfterFire */ 		
 		PHYSFSX_printf(fout,"nofireautoselect=%i\n",PlayerCfg.NoFireAutoselect);
 		PHYSFSX_printf(fout,"cycleautoselectonly=%i\n",PlayerCfg.CycleAutoselectOnly);
@@ -1199,8 +1230,8 @@ int read_player_file()
 	kc_set_controls();
 
 #ifdef __ANDROID__
-	/* Force mouse enabled on Android - touch overlay relies on it */
-	PlayerCfg.ControlType |= 2; /* CONTROL_USING_MOUSE */
+	/* Force mouse + joystick enabled on Android */
+	PlayerCfg.ControlType |= 3; /* CONTROL_USING_JOYSTICK | CONTROL_USING_MOUSE */
 #endif
 
 	return EZERO;

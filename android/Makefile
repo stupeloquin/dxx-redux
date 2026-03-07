@@ -27,10 +27,10 @@ DXX_GAME        ?= d1x
 
 ifeq ($(DXX_GAME),d2x)
     DXX_PACKAGE := com.dxxredux.d2x
-    GAME_DATA   := $(abspath $(MAKEFILE_DIR)/../../descent2/data)
+    GAME_DATA   := $(abspath $(MAKEFILE_DIR)/../../data/descent2/data)
 else
     DXX_PACKAGE := com.dxxredux.d1x
-    GAME_DATA   := $(abspath $(MAKEFILE_DIR)/../../descent/data)
+    GAME_DATA   := $(abspath $(MAKEFILE_DIR)/../../data/descent/data)
 endif
 
 # --- Docker ---
@@ -64,6 +64,7 @@ _build:
 		-e DXX_GAME=$(DXX_GAME) \
 		-v $(DXX_ROOT):/build/dxx-redux \
 		-v $(ANDROID_PROJECT):/build/dxx-android \
+		-v $(GAME_DATA):/build/game-data:ro \
 		$(BUILDER_IMAGE) \
 		/build/dxx-redux/android/build-android.sh" 2>/dev/null
 	$(DOCKER) "docker start -a $(CONTAINER)"

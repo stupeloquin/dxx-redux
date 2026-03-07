@@ -274,6 +274,7 @@ set(SRC_ANDROID_STUBS
     ${DXX_ANDROID_DIR}/xmodel_stub.c
     ${DXX_ANDROID_DIR}/messagebox.c
     ${DXX_ANDROID_DIR}/touch.c
+    ${DXX_ANDROID_DIR}/adlmidi_dynamic.c
 )
 
 # --------------------------------------------------------------------------

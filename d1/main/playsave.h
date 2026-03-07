@@ -103,7 +103,8 @@ typedef struct player_config
 	int AlphaEffects;
 	int DynLightColor;
 	ubyte DisableCockpit;  /* DisableCockpit */ 
-	ubyte StickyRearview; /* StickyRearview */ 
+	ubyte StickyRearview; /* StickyRearview */
+	ubyte UseGyro;
 	ubyte SelectAfterFire; /* SelectAfterFire */ 
 	int maxFps;
 	int ShipColor; 

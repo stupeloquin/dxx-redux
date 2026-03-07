@@ -17,6 +17,32 @@
 #include "u_mem.h"
 #include "console.h"
 
+#ifdef __ANDROID__
+#include "adlmidi_dynamic.h"
+static ADL_MIDIPlayer *adlmidi_player = NULL;
+static int adlmidi_playing = 0;
+
+static void mix_adlmidi_callback(void *udata, Uint8 *stream, int len)
+{
+	ADLMIDI_AudioFormat format;
+	int sampleCount;
+	(void)udata;
+
+	if (!adlmidi_player || !adlmidi_playing)
+	{
+		memset(stream, 0, len);
+		return;
+	}
+
+	format.type = ADLMIDI_SampleType_S16;
+	format.containerSize = sizeof(Sint16);
+	format.sampleOffset = sizeof(Sint16) * 2; /* stereo interleaved */
+	sampleCount = len / (int)sizeof(Sint16);
+
+	adl_playFormat(adlmidi_player, sampleCount, stream, stream + sizeof(Sint16), &format);
+}
+#endif
+
 #ifdef _WIN32
 extern int digi_win32_play_midi_song( char * filename, int loop );
 #endif
@@ -46,6 +72,40 @@ int mix_play_file(char *filename, int loop, void (*hook_finished_track)())
 	// It's a .hmp!
 	if (!d_stricmp(fptr, ".hmp"))
 	{
+#ifdef __ANDROID__
+		/* Try ADLMIDI first — OPL3 synth with embedded Descent bank */
+		if (adlmidi_load())
+		{
+			if (!adlmidi_player)
+			{
+				int freq;
+				Mix_QuerySpec(&freq, NULL, NULL);
+				if (!freq) freq = 44100;
+				adlmidi_player = adl_init(freq);
+				if (adlmidi_player)
+				{
+					adl_switchEmulator(adlmidi_player, ADLMIDI_EMU_DOSBOX);
+					adl_setNumChips(adlmidi_player, 2);
+					adl_setBank(adlmidi_player, ADL_BANK_DESCENT);
+					adl_setSoftPanEnabled(adlmidi_player, 1);
+				}
+			}
+			if (adlmidi_player)
+			{
+				hmp2mid(filename, &current_music_hndlbuf, &bufsize);
+				if (current_music_hndlbuf && bufsize > 0 &&
+				    adl_openData(adlmidi_player, current_music_hndlbuf, bufsize) == 0)
+				{
+					adl_setLoopEnabled(adlmidi_player, loop ? 1 : 0);
+					adlmidi_playing = 1;
+					Mix_HookMusic(mix_adlmidi_callback, NULL);
+					Mix_HookMusicFinished(hook_finished_track ? hook_finished_track : mix_free_music);
+					return 1;
+				}
+				con_printf(CON_NORMAL, "ADLMIDI: failed to open MIDI data, falling back");
+			}
+		}
+#endif
 		hmp2mid(filename, &current_music_hndlbuf, &bufsize);
 		rw = SDL_RWFromConstMem(current_music_hndlbuf,bufsize*sizeof(char));
 		current_music = Mix_LoadMUS_RW(rw, 0);
@@ -109,6 +169,13 @@ int mix_play_file(char *filename, int loop, void (*hook_finished_track)())
 // What to do when stopping song playback
 void mix_free_music()
 {
+#ifdef __ANDROID__
+	if (adlmidi_playing)
+	{
+		Mix_HookMusic(NULL, NULL);
+		adlmidi_playing = 0;
+	}
+#endif
 	Mix_HaltMusic();
 	if (current_music)
 	{
@@ -130,6 +197,13 @@ void mix_set_music_volume(int vol)
 
 void mix_stop_music()
 {
+#ifdef __ANDROID__
+	if (adlmidi_playing)
+	{
+		Mix_HookMusic(NULL, NULL);
+		adlmidi_playing = 0;
+	}
+#endif
 	Mix_HaltMusic();
 	if (current_music_hndlbuf)
 	{
