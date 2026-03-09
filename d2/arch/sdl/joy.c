@@ -11,6 +11,7 @@
 #include "timer.h"
 #include "console.h"
 #include "event.h"
+#include "key.h"
 #include "text.h"
 #include "u_mem.h"
 #include "playsave.h"
@@ -18,6 +19,9 @@
 
 int num_joysticks = 0;
 int joy_num_axes = 0;
+
+/* Map virtual joystick buttons to keyboard keys for menu navigation */
+static unsigned joy_key_map[JOY_MAX_BUTTONS];
 
 /* This struct is a "virtual" joystick, which includes all the axes
  * and buttons of every joystick found.
@@ -35,6 +39,12 @@ typedef struct d_event_joystickbutton
 	event_type type;
 	int button;
 } d_event_joystickbutton;
+
+typedef struct d_event_keycommand
+{
+	event_type type;
+	int keycode;
+} d_event_keycommand;
 
 typedef struct d_event_joystick_moved
 {
@@ -236,6 +246,7 @@ void joy_init()
 	memset(&Joystick,0,sizeof(Joystick));
 	memset(joyaxis_text, 0, JOY_MAX_AXES * sizeof(char *));
 	memset(joybutton_text, 0, JOY_MAX_BUTTONS * sizeof(char *));
+	memset(joy_key_map, 0, sizeof(joy_key_map));
 
 	n = SDL_NumJoysticks();
 
@@ -300,6 +311,14 @@ void joy_init()
 			for (j=0; j < SDL_Joysticks[num_joysticks].n_buttons; j++)
 			{
 				sprintf(temp, "J%d B%d", i + 1, j + 1);
+				switch (j + 1)
+				{
+					case 1: joy_key_map[Joystick.n_buttons] = KEY_ENTER; break;
+					case 2: joy_key_map[Joystick.n_buttons] = KEY_ESC; break;
+					case 3: joy_key_map[Joystick.n_buttons] = KEY_SPACEBAR; break;
+					case 4: joy_key_map[Joystick.n_buttons] = KEY_DELETE; break;
+					default: break;
+				}
 				joybutton_text[Joystick.n_buttons] = d_strdup(temp);
 				SDL_Joysticks[num_joysticks].button_map[j] = Joystick.n_buttons++;
 			}
@@ -309,12 +328,16 @@ void joy_init()
 					break;
 				SDL_Joysticks[num_joysticks].hat_map[j] = Joystick.n_buttons;
 				//a hat counts as four buttons
+				joy_key_map[Joystick.n_buttons] = KEY_UP;
 				sprintf(temp, "J%d H%d%c", i + 1, j + 1, 0202);
 				joybutton_text[Joystick.n_buttons++] = d_strdup(temp);
+				joy_key_map[Joystick.n_buttons] = KEY_RIGHT;
 				sprintf(temp, "J%d H%d%c", i + 1, j + 1, 0177);
 				joybutton_text[Joystick.n_buttons++] = d_strdup(temp);
+				joy_key_map[Joystick.n_buttons] = KEY_DOWN;
 				sprintf(temp, "J%d H%d%c", i + 1, j + 1, 0200);
 				joybutton_text[Joystick.n_buttons++] = d_strdup(temp);
+				joy_key_map[Joystick.n_buttons] = KEY_LEFT;
 				sprintf(temp, "J%d H%d%c", i + 1, j + 1, 0201);
 				joybutton_text[Joystick.n_buttons++] = d_strdup(temp);
 			}
@@ -324,8 +347,10 @@ void joy_init()
 					break;
 				SDL_Joysticks[num_joysticks].axis_button_map[j] = Joystick.n_buttons;
 				//an axis count as 2 buttons. negative - and positive +
+				joy_key_map[Joystick.n_buttons] = (j == 0) ? KEY_RIGHT : (j == 1) ? KEY_DOWN : 0;
 				sprintf(temp, "J%d -A%d", i + 1, j + 1);
 				joybutton_text[Joystick.n_buttons++] = d_strdup(temp);
+				joy_key_map[Joystick.n_buttons] = (j == 0) ? KEY_LEFT : (j == 1) ? KEY_UP : 0;
 				sprintf(temp, "J%d +A%d", i + 1, j + 1);
 				joybutton_text[Joystick.n_buttons++] = d_strdup(temp);
 			}
@@ -375,4 +400,27 @@ int event_joystick_get_button(d_event *event)
 {
 	Assert((event->type == EVENT_JOYSTICK_BUTTON_DOWN) || (event->type == EVENT_JOYSTICK_BUTTON_UP));
 	return ((d_event_joystickbutton *)event)->button;
+}
+
+int joy_translate_menu_key(d_event *event)
+{
+	int button;
+	unsigned key;
+	d_event_keycommand key_event;
+
+	if (event->type != EVENT_JOYSTICK_BUTTON_DOWN)
+		return 0;
+
+	button = ((d_event_joystickbutton *)event)->button;
+	if (button < 0 || button >= JOY_MAX_BUTTONS)
+		return 0;
+
+	key = joy_key_map[button];
+	if (!key)
+		return 0;
+
+	key_event.type = EVENT_KEY_COMMAND;
+	key_event.keycode = key;
+	event_send((d_event *)&key_event);
+	return 1;
 }

@@ -32,5 +32,6 @@ extern int joy_axis_handler(SDL_JoyAxisEvent *jae);
 extern int joy_axisbutton_handler(SDL_JoyAxisEvent *jae);
 
 extern int joy_apply_deadzone(int value, int deadzone);
+extern int joy_translate_menu_key(struct d_event *event);
 
 #endif // _JOY_H

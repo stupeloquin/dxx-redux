@@ -1501,6 +1501,9 @@ int newmenu_handler(window *wind, d_event *event, newmenu *menu)
 		}
 	}
 
+	if (joy_translate_menu_key(event))
+		return 1;
+
 	switch (event->type)
 	{
 		case EVENT_WINDOW_ACTIVATED:
@@ -2096,6 +2099,9 @@ int listbox_handler(window *wind, d_event *event, listbox *lb)
 		if (rval)
 			return 1;		// event handled
 	}
+
+	if (joy_translate_menu_key(event))
+		return 1;
 
 	switch (event->type)
 	{

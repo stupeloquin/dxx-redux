@@ -1,11 +1,12 @@
 /*
  * Touch overlay controls for Android.
  *
- * Provides dual virtual thumbsticks, a fire zone, and action buttons.
- * Left stick: forward/back + slide left/right (injects key events)
+ * Provides a single consistent overlay for both menus and gameplay:
+ * Left stick: thrust/slide in game, arrow keys in menus
  * Right stick: pitch + yaw (injects mouse motion events)
  * Fire zone: primary fire (injects mouse button events)
- * Action buttons: map, menu, secondary fire, flare, bomb, afterburner
+ * Action buttons: ESC, MAP, secondary fire, flare, bomb, rear view
+ * Non-button taps become mouse clicks when a menu is active.
  */
 
 #ifdef __ANDROID__
@@ -15,8 +16,11 @@
 
 #include <SDL.h>
 #include <GLES/gl.h>
+#include <android/log.h>
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "DXX-TOUCH", __VA_ARGS__)
 
 #include "touch.h"
+#include "playsave.h"
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                          */
@@ -24,12 +28,12 @@
 
 #define MAX_FINGERS      10
 #define STICK_RADIUS     0.10f   /* fraction of screen height */
-#define STICK_DEAD_ZONE  0.015f  /* fraction of screen height */
-#define MOUSE_SENSITIVITY 8.0f   /* right stick to mouse motion multiplier */
+#define STICK_DEAD_ZONE  0.025f  /* fraction of screen height */
+#define MOUSE_SENSITIVITY 2.5f   /* right stick to mouse motion multiplier */
+#define GYRO_SENSITIVITY  15.0f  /* gyroscope angular velocity to mouse motion */
 
 /* Button layout: small circular buttons */
 #define BTN_RADIUS       0.04f   /* fraction of screen height */
-#define BTN_MARGIN       0.02f   /* margin from edge, fraction */
 
 /* Circle drawing resolution */
 #define CIRCLE_SEGMENTS  24
@@ -57,11 +61,9 @@ enum {
 	ZONE_BTN_FLARE,
 	ZONE_BTN_BOMB,
 	ZONE_BTN_REAR,
-	/* Menu-mode zones */
-	ZONE_MENU_ENTER,
-	ZONE_MENU_KEYBOARD,
-	ZONE_MENU_UP,
-	ZONE_MENU_DOWN,
+	ZONE_BTN_ROLL_LEFT,
+	ZONE_BTN_ROLL_RIGHT,
+	ZONE_BTN_HIDE,
 	NUM_ZONES
 };
 
@@ -82,29 +84,16 @@ static touch_button_t touch_buttons[] = {
 	{ 0.95f, 0.50f, ZONE_BTN_FLARE,     SDLK_f,      "FLR" },
 	{ 0.95f, 0.70f, ZONE_BTN_BOMB,      SDLK_b,      "BMB" },
 
+	/* Roll buttons - bottom left area */
+	{ 0.05f, 0.85f, ZONE_BTN_ROLL_LEFT,  SDLK_q,      "R_L" },
+	{ 0.15f, 0.85f, ZONE_BTN_ROLL_RIGHT, SDLK_e,      "R_R" },
+
 	/* Top buttons */
 	{ 0.05f, 0.06f, ZONE_BTN_MAP,       SDLK_TAB,    "MAP" },
 	{ 0.50f, 0.06f, ZONE_BTN_REAR,      SDLK_r,      "RVW" },
 	{ 0.95f, 0.06f, ZONE_BTN_MENU,      SDLK_ESCAPE, "ESC" },
-
-	/* Bottom-left: nav for in-game menus (difficulty select, etc.) */
-	{ 0.05f, 0.75f, ZONE_MENU_UP,       SDLK_UP,     "UP"  },
-	{ 0.05f, 0.90f, ZONE_MENU_DOWN,     SDLK_DOWN,   "DN"  },
-	{ 0.15f, 0.83f, ZONE_MENU_ENTER,    SDLK_RETURN, "OK"  },
 };
 #define NUM_BUTTONS (sizeof(touch_buttons) / sizeof(touch_buttons[0]))
-
-/* Menu-mode buttons */
-#define MENU_BTN_RADIUS  0.06f  /* slightly larger for easy tapping */
-
-static touch_button_t menu_buttons[] = {
-	{ 0.92f, 0.90f, ZONE_MENU_ENTER,    SDLK_RETURN,   "OK"  },
-	{ 0.92f, 0.72f, ZONE_MENU_KEYBOARD, 0,              "KB"  },
-	{ 0.92f, 0.36f, ZONE_MENU_UP,       SDLK_UP,       "UP"  },
-	{ 0.92f, 0.54f, ZONE_MENU_DOWN,     SDLK_DOWN,     "DN"  },
-	{ 0.92f, 0.12f, ZONE_BTN_MENU,      SDLK_ESCAPE,   "ESC" },
-};
-#define NUM_MENU_BUTTONS (sizeof(menu_buttons) / sizeof(menu_buttons[0]))
 
 /* ------------------------------------------------------------------ */
 /* Finger tracking                                                    */
@@ -119,7 +108,13 @@ typedef struct {
 } touch_finger_t;
 
 static touch_finger_t fingers[MAX_FINGERS];
-static int in_game_mode = 0;
+static int gameplay_active = 0;  /* 1 = pure gameplay, 0 = menu is on top */
+static int touch_hidden = 0;
+
+/* Hide/show button - always visible in bottom-right corner */
+#define HIDE_BTN_CX     0.97f
+#define HIDE_BTN_CY     0.97f
+#define HIDE_BTN_RADIUS 0.025f  /* small, unobtrusive */
 
 /* Left stick state */
 static float lstick_cx, lstick_cy;     /* center of active left stick */
@@ -134,10 +129,12 @@ static int   rstick_active = 0;
 /* Fire state */
 static int fire_active = 0;
 
-/* Key state tracking to avoid repeat injections.
- * Left stick maps to game defaults: A=accelerate, Z=reverse, PAD1=slide left, PAD3=slide right */
-static int key_fwd_down = 0, key_rev_down = 0;
-static int key_sleft_down = 0, key_sright_down = 0;
+/* Key state tracking to avoid repeat injections */
+static int key_up_down = 0, key_down_down = 0;
+static int key_left_down = 0, key_right_down = 0;
+
+/* Gyroscope sensor */
+static SDL_Sensor *gyro_sensor = NULL;
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
@@ -233,38 +230,58 @@ static int classify_zone(float x, float y)
 			return touch_buttons[i].zone;
 	}
 
-	/* Fire zone: only inside the visible red box */
-	if (x >= FIRE_ZONE_LEFT && x <= 0.92f && y >= FIRE_ZONE_TOP && y <= FIRE_ZONE_BOT)
+	/* Fire zone: only active during gameplay */
+	if (gameplay_active && x >= FIRE_ZONE_LEFT && x <= 0.92f &&
+	    y >= FIRE_ZONE_TOP && y <= FIRE_ZONE_BOT)
 		return ZONE_FIRE;
 
 	/* Left half = left stick */
 	if (x < SCREEN_SPLIT)
 		return ZONE_LEFT_STICK;
 
-	/* Right half = right stick (for aiming) */
-	return ZONE_RIGHT_STICK;
+	/* Right half: right stick during gameplay, none in menus
+	 * (so taps fall through to mouse clicks) */
+	if (gameplay_active)
+		return ZONE_RIGHT_STICK;
+
+	return ZONE_NONE;
 }
 
 /* ------------------------------------------------------------------ */
 /* Stick update logic                                                 */
 /* ------------------------------------------------------------------ */
 
+static void release_left_stick_keys(void)
+{
+	if (key_up_down)    { push_key_event(gameplay_active ? SDLK_a      : SDLK_UP,    0); key_up_down = 0; }
+	if (key_down_down)  { push_key_event(gameplay_active ? SDLK_z      : SDLK_DOWN,  0); key_down_down = 0; }
+	if (key_left_down)  { push_key_event(gameplay_active ? SDLK_KP_1   : SDLK_LEFT,  0); key_left_down = 0; }
+	if (key_right_down) { push_key_event(gameplay_active ? SDLK_KP_3   : SDLK_RIGHT, 0); key_right_down = 0; }
+}
+
 static void update_left_stick(void)
 {
 	float threshold = STICK_DEAD_ZONE / STICK_RADIUS;
-	int want_fwd = 0, want_rev = 0, want_sleft = 0, want_sright = 0;
+	int want_up = 0, want_down = 0, want_left = 0, want_right = 0;
 
 	if (lstick_active) {
-		if (lstick_dy < -threshold) want_fwd = 1;    /* up = accelerate (A key) */
-		if (lstick_dy > threshold)  want_rev = 1;    /* down = reverse (Z key) */
-		if (lstick_dx < -threshold) want_sleft = 1;  /* left = slide left (PAD1) */
-		if (lstick_dx > threshold)  want_sright = 1; /* right = slide right (PAD3) */
+		if (lstick_dy < -threshold) want_up = 1;
+		if (lstick_dy > threshold)  want_down = 1;
+		if (lstick_dx < -threshold) want_left = 1;
+		if (lstick_dx > threshold)  want_right = 1;
 	}
 
-	if (want_fwd != key_fwd_down)       { push_key_event(SDLK_a,    want_fwd);    key_fwd_down = want_fwd; }
-	if (want_rev != key_rev_down)       { push_key_event(SDLK_z,    want_rev);    key_rev_down = want_rev; }
-	if (want_sleft != key_sleft_down)   { push_key_event(SDLK_KP_1, want_sleft);  key_sleft_down = want_sleft; }
-	if (want_sright != key_sright_down) { push_key_event(SDLK_KP_3, want_sright); key_sright_down = want_sright; }
+	/* In gameplay: A=thrust, Z=reverse, KP1=slide left, KP3=slide right
+	 * In menus: arrow keys for navigation */
+	SDL_Keycode key_u = gameplay_active ? SDLK_a    : SDLK_UP;
+	SDL_Keycode key_d = gameplay_active ? SDLK_z    : SDLK_DOWN;
+	SDL_Keycode key_l = gameplay_active ? SDLK_KP_1 : SDLK_LEFT;
+	SDL_Keycode key_r = gameplay_active ? SDLK_KP_3 : SDLK_RIGHT;
+
+	if (want_up != key_up_down)       { push_key_event(key_u, want_up);    key_up_down = want_up; }
+	if (want_down != key_down_down)   { push_key_event(key_d, want_down);  key_down_down = want_down; }
+	if (want_left != key_left_down)   { push_key_event(key_l, want_left);  key_left_down = want_left; }
+	if (want_right != key_right_down) { push_key_event(key_r, want_right); key_right_down = want_right; }
 }
 
 static void update_right_stick(int screen_w, int screen_h)
@@ -277,7 +294,48 @@ static void update_right_stick(int screen_w, int screen_h)
 		return;
 
 	int mx = (int)(rstick_dx * MOUSE_SENSITIVITY * (screen_w / 640.0f));
-	int my = (int)(rstick_dy * MOUSE_SENSITIVITY * (screen_h / 480.0f));
+	float pitch_dir = PlayerCfg.InvertTouchPitch ? -1.0f : 1.0f;
+	int my = (int)(rstick_dy * pitch_dir * MOUSE_SENSITIVITY * (screen_h / 480.0f));
+	push_mouse_motion(mx, my);
+}
+
+static int gyro_log_counter = 0;
+
+static void update_gyroscope(int screen_w, int screen_h)
+{
+	float data[3];
+
+	if (!gyro_sensor || !PlayerCfg.UseGyro)
+		return;
+
+	if (SDL_SensorGetData(gyro_sensor, data, 3) < 0) {
+		if (gyro_log_counter++ % 300 == 0)
+			LOGD("SDL_SensorGetData failed: %s", SDL_GetError());
+		return;
+	}
+
+	/* Log raw data periodically for debugging */
+	if (gyro_log_counter++ % 300 == 0)
+		LOGD("gyro raw data: %.4f %.4f %.4f", data[0], data[1], data[2]);
+
+	/* Gyro data is in the phone's natural (portrait) coordinate frame.
+	 * In landscape mode the axes rotate 90 degrees:
+	 * data[0]=X (portrait pitch) → landscape yaw (turn L/R)
+	 * data[1]=Y (portrait yaw)   → landscape pitch (look U/D) */
+	float yaw   = data[0];  /* portrait X axis = landscape turn left/right */
+	float pitch = data[1];  /* portrait Y axis = landscape pitch up/down */
+
+	/* Dead zone: ignore tiny movements (gyro drift) */
+	float deadzone = 0.05f;
+	if (fabsf(yaw) < deadzone) yaw = 0;
+	if (fabsf(pitch) < deadzone) pitch = 0;
+
+	if (yaw == 0 && pitch == 0)
+		return;
+
+	float pitch_dir = PlayerCfg.InvertTouchPitch ? -1.0f : 1.0f;
+	int mx = (int)(yaw * GYRO_SENSITIVITY * (screen_w / 640.0f));
+	int my = (int)(pitch * pitch_dir * GYRO_SENSITIVITY * (screen_h / 480.0f));
 	push_mouse_motion(mx, my);
 }
 
@@ -287,24 +345,62 @@ static void update_right_stick(int screen_w, int screen_h)
 
 void touch_overlay_init(void)
 {
+	int i, n;
+
+	LOGD("touch_overlay_init called");
 	memset(fingers, 0, sizeof(fingers));
 	lstick_active = rstick_active = fire_active = 0;
-	key_fwd_down = key_rev_down = key_sleft_down = key_sright_down = 0;
-	in_game_mode = 0;
+	key_up_down = key_down_down = key_left_down = key_right_down = 0;
+	gameplay_active = 0;
+	touch_hidden = 0;
+
+	/* Open gyroscope sensor if available */
+	gyro_sensor = NULL;
+	if (SDL_InitSubSystem(SDL_INIT_SENSOR) < 0) {
+		LOGD("SDL_InitSubSystem(SENSOR) failed: %s", SDL_GetError());
+	} else {
+		n = SDL_NumSensors();
+		LOGD("SDL_NumSensors() = %d", n);
+		for (i = 0; i < n; i++) {
+			SDL_SensorType stype = SDL_SensorGetDeviceType(i);
+			LOGD("sensor %d type=%d name=%s", i, (int)stype,
+			        SDL_SensorGetDeviceName(i) ? SDL_SensorGetDeviceName(i) : "?");
+			if (stype == SDL_SENSOR_GYRO) {
+				gyro_sensor = SDL_SensorOpen(i);
+				if (gyro_sensor)
+					LOGD("gyroscope opened OK");
+				else
+					LOGD("SDL_SensorOpen failed: %s", SDL_GetError());
+				break;
+			}
+		}
+		if (!gyro_sensor)
+			LOGD("no gyroscope sensor found");
+	}
 }
 
 void touch_overlay_set_game_mode(int in_game)
 {
-	if (in_game_mode && !in_game) {
-		/* Leaving game mode - release all keys */
-		if (key_fwd_down)    { push_key_event(SDLK_a,    0); key_fwd_down = 0; }
-		if (key_rev_down)    { push_key_event(SDLK_z,    0); key_rev_down = 0; }
-		if (key_sleft_down)  { push_key_event(SDLK_KP_1, 0); key_sleft_down = 0; }
-		if (key_sright_down) { push_key_event(SDLK_KP_3, 0); key_sright_down = 0; }
+	if (gameplay_active && !in_game) {
+		/* Entering menu from gameplay - release game keys, keep stick active
+		 * so it can seamlessly switch to arrow key injection */
+		release_left_stick_keys();
 		if (fire_active) { push_mouse_button(SDL_BUTTON_LEFT, 0); fire_active = 0; }
-		lstick_active = rstick_active = 0;
+		rstick_active = 0;
 	}
-	in_game_mode = in_game;
+	else if (!gameplay_active && in_game) {
+		/* Entering gameplay from menu - release menu keys */
+		release_left_stick_keys();
+	}
+	gameplay_active = in_game;
+}
+
+static int hit_hide_button(float x, float y)
+{
+	float dx = x - HIDE_BTN_CX;
+	float dy = y - HIDE_BTN_CY;
+	float hit_r = HIDE_BTN_RADIUS * 2.0f; /* generous hit area */
+	return (dx*dx + dy*dy < hit_r*hit_r);
 }
 
 int touch_overlay_process_event(SDL_Event *event)
@@ -318,66 +414,23 @@ int touch_overlay_process_event(SDL_Event *event)
 	float y = event->tfinger.y;
 	SDL_FingerID fid = event->tfinger.fingerId;
 
-	if (!in_game_mode) {
-		/* Menu mode: check menu buttons first, then pass as mouse click */
-		int screen_w = 640, screen_h = 480;
-		SDL_Window *win = SDL_GL_GetCurrentWindow();
-		if (win)
-			SDL_GetWindowSize(win, &screen_w, &screen_h);
-
-		/* Check if touch hits a menu button */
-		int menu_zone = ZONE_NONE;
-		for (int i = 0; i < (int)NUM_MENU_BUTTONS; i++) {
-			float dx = x - menu_buttons[i].cx;
-			float dy = y - menu_buttons[i].cy;
-			float hit_r = MENU_BTN_RADIUS * 1.5f;
-			if (dx*dx + dy*dy < hit_r*hit_r) {
-				menu_zone = menu_buttons[i].zone;
-				break;
-			}
-		}
-
-		if (menu_zone != ZONE_NONE) {
-			if (menu_zone == ZONE_MENU_KEYBOARD) {
-				if (event->type == SDL_FINGERDOWN) {
-					if (SDL_IsTextInputActive())
-						SDL_StopTextInput();
-					else
-						SDL_StartTextInput();
-				}
-			} else {
-				/* Find the key for this zone */
-				for (int i = 0; i < (int)NUM_MENU_BUTTONS; i++) {
-					if (menu_buttons[i].zone == menu_zone && menu_buttons[i].key) {
-						if (event->type == SDL_FINGERDOWN)
-							push_key_event(menu_buttons[i].key, 1);
-						else if (event->type == SDL_FINGERUP)
-							push_key_event(menu_buttons[i].key, 0);
-						break;
-					}
-				}
-			}
-			return 1;
-		}
-
-		/* Regular touch → mouse click for menus */
-		if (event->type == SDL_FINGERDOWN) {
-			push_mouse_click(x, y, 1, screen_w, screen_h);
-		} else if (event->type == SDL_FINGERUP) {
-			push_mouse_click(x, y, 0, screen_w, screen_h);
-		} else if (event->type == SDL_FINGERMOTION) {
-			SDL_Event mev;
-			memset(&mev, 0, sizeof(mev));
-			mev.type = SDL_MOUSEMOTION;
-			mev.motion.x = (int)(x * screen_w);
-			mev.motion.y = (int)(y * screen_h);
-			mev.motion.state = SDL_BUTTON_LMASK;
-			SDL_PushEvent(&mev);
+	/* Hide/show toggle - always active */
+	if (event->type == SDL_FINGERDOWN && hit_hide_button(x, y)) {
+		touch_hidden = !touch_hidden;
+		if (touch_hidden) {
+			release_left_stick_keys();
+			if (fire_active) { push_mouse_button(SDL_BUTTON_LEFT, 0); fire_active = 0; }
+			lstick_active = rstick_active = 0;
+			memset(fingers, 0, sizeof(fingers));
 		}
 		return 1;
 	}
 
-	/* Game mode */
+	/* When hidden, don't process any other touches */
+	if (touch_hidden)
+		return 0;
+
+	/* --- Finger down --- */
 	if (event->type == SDL_FINGERDOWN) {
 		touch_finger_t *f = alloc_finger(fid);
 		if (!f) return 1;
@@ -410,6 +463,12 @@ int touch_overlay_process_event(SDL_Event *event)
 			rstick_dx = rstick_dy = 0;
 			rstick_active = 1;
 			break;
+		case ZONE_NONE:
+			if (!gameplay_active) {
+				/* In menus: tap to confirm (ENTER) */
+				push_key_event(SDLK_RETURN, 1);
+			}
+			break;
 		default:
 			/* Action button - press key */
 			for (int i = 0; i < (int)NUM_BUTTONS; i++) {
@@ -423,6 +482,7 @@ int touch_overlay_process_event(SDL_Event *event)
 		return 1;
 	}
 
+	/* --- Finger up --- */
 	if (event->type == SDL_FINGERUP) {
 		touch_finger_t *f = find_finger(fid);
 		if (!f) return 1;
@@ -443,6 +503,11 @@ int touch_overlay_process_event(SDL_Event *event)
 			rstick_active = 0;
 			rstick_dx = rstick_dy = 0;
 			break;
+		case ZONE_NONE:
+			if (!gameplay_active) {
+				push_key_event(SDLK_RETURN, 0);
+			}
+			break;
 		default:
 			for (int i = 0; i < (int)NUM_BUTTONS; i++) {
 				if (touch_buttons[i].zone == f->zone) {
@@ -457,6 +522,7 @@ int touch_overlay_process_event(SDL_Event *event)
 		return 1;
 	}
 
+	/* --- Finger motion --- */
 	if (event->type == SDL_FINGERMOTION) {
 		touch_finger_t *f = find_finger(fid);
 		if (!f) return 1;
@@ -482,6 +548,7 @@ int touch_overlay_process_event(SDL_Event *event)
 			rstick_dx = dx;
 			rstick_dy = dy;
 		}
+		/* ZONE_NONE motion is ignored */
 		return 1;
 	}
 
@@ -491,37 +558,6 @@ int touch_overlay_process_event(SDL_Event *event)
 /* ------------------------------------------------------------------ */
 /* Drawing helpers (GLES 1.x)                                         */
 /* ------------------------------------------------------------------ */
-
-static void draw_circle(float cx, float cy, float r, int segments, float alpha)
-{
-	GLfloat verts[(CIRCLE_SEGMENTS + 2) * 2];
-	GLfloat colors[(CIRCLE_SEGMENTS + 2) * 4];
-
-	/* Center vertex */
-	verts[0] = cx;
-	verts[1] = cy;
-	colors[0] = 1.0f; colors[1] = 1.0f; colors[2] = 1.0f; colors[3] = alpha * 0.15f;
-
-	for (int i = 0; i <= segments; i++) {
-		float angle = (float)i / (float)segments * 2.0f * 3.14159265f;
-		int vi = (i + 1) * 2;
-		int ci = (i + 1) * 4;
-		verts[vi]     = cx + cosf(angle) * r;
-		verts[vi + 1] = cy + sinf(angle) * r;
-		colors[ci]     = 1.0f;
-		colors[ci + 1] = 1.0f;
-		colors[ci + 2] = 1.0f;
-		colors[ci + 3] = alpha * 0.3f;
-	}
-
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glEnableClientState(GL_COLOR_ARRAY);
-	glVertexPointer(2, GL_FLOAT, 0, verts);
-	glColorPointer(4, GL_FLOAT, 0, colors);
-	glDrawArrays(GL_TRIANGLE_FAN, 0, segments + 2);
-	glDisableClientState(GL_COLOR_ARRAY);
-	glDisableClientState(GL_VERTEX_ARRAY);
-}
 
 static void draw_ring(float cx, float cy, float r, int segments, float r_col, float g_col, float b_col, float alpha)
 {
@@ -585,11 +621,23 @@ static void draw_filled_circle(float cx, float cy, float r, int segments,
 /* Draw overlay                                                        */
 /* ------------------------------------------------------------------ */
 
+static void draw_hide_button(float sw, float sh)
+{
+	float bx = HIDE_BTN_CX * sw;
+	float by = HIDE_BTN_CY * sh;
+	float r = HIDE_BTN_RADIUS * sh;
+	float alpha = touch_hidden ? 0.15f : 0.3f;
+	draw_filled_circle(bx, by, r, CIRCLE_SEGMENTS, 0.6f, 0.6f, 0.6f, alpha);
+	draw_ring(bx, by, r, CIRCLE_SEGMENTS, 0.8f, 0.8f, 0.8f, alpha + 0.15f);
+}
+
 void touch_overlay_draw(int screen_w, int screen_h)
 {
-	/* Update right stick → mouse motion each frame (game mode only) */
-	if (in_game_mode)
+	/* Update right stick and gyroscope → mouse motion each frame (gameplay only) */
+	if (gameplay_active && !touch_hidden) {
 		update_right_stick(screen_w, screen_h);
+		update_gyroscope(screen_w, screen_h);
+	}
 
 	/* Save GL state */
 	glPushMatrix();
@@ -607,23 +655,28 @@ void touch_overlay_draw(int screen_w, int screen_h)
 
 	float sh = (float)screen_h;
 	float sw = (float)screen_w;
+
+	/* Always draw the hide/show toggle button */
+	draw_hide_button(sw, sh);
+
+	if (touch_hidden)
+		goto restore_gl;
+
 	float stick_r_px = STICK_RADIUS * sh;
 	float btn_r_px = BTN_RADIUS * sh;
 
-	/* Draw left stick (game mode only) */
-	if (in_game_mode && lstick_active) {
+	/* Draw left stick when active */
+	if (lstick_active) {
 		float cx = lstick_cx * sw;
 		float cy = lstick_cy * sh;
-		/* Outer ring */
 		draw_ring(cx, cy, stick_r_px, CIRCLE_SEGMENTS, 1.0f, 1.0f, 1.0f, 0.3f);
-		/* Inner nub showing deflection */
 		float nx = cx + lstick_dx * stick_r_px;
 		float ny = cy + lstick_dy * stick_r_px;
 		draw_filled_circle(nx, ny, stick_r_px * 0.3f, CIRCLE_SEGMENTS, 1.0f, 1.0f, 1.0f, 0.5f);
 	}
 
-	/* Draw right stick (game mode only) */
-	if (in_game_mode && rstick_active) {
+	/* Draw right stick when active (gameplay only) */
+	if (gameplay_active && rstick_active) {
 		float cx = rstick_cx * sw;
 		float cy = rstick_cy * sh;
 		draw_ring(cx, cy, stick_r_px, CIRCLE_SEGMENTS, 0.5f, 0.8f, 1.0f, 0.3f);
@@ -632,13 +685,13 @@ void touch_overlay_draw(int screen_w, int screen_h)
 		draw_filled_circle(nx, ny, stick_r_px * 0.3f, CIRCLE_SEGMENTS, 0.5f, 0.8f, 1.0f, 0.5f);
 	}
 
-	/* Draw fire zone indicator (game mode only) */
-	if (in_game_mode) {
+	/* Draw fire zone indicator (gameplay only) */
+	if (gameplay_active) {
 		float alpha = fire_active ? 0.4f : 0.15f;
 		float fx = FIRE_ZONE_LEFT * sw;
 		float fy1 = FIRE_ZONE_TOP * sh;
 		float fy2 = FIRE_ZONE_BOT * sh;
-		float fw = (0.92f - FIRE_ZONE_LEFT) * sw; /* up to just before the buttons */
+		float fw = (0.92f - FIRE_ZONE_LEFT) * sw;
 
 		GLfloat verts[] = { fx, fy1, fx, fy2, fx+fw, fy2, fx+fw, fy1 };
 		GLfloat cols[] = {
@@ -657,8 +710,7 @@ void touch_overlay_draw(int screen_w, int screen_h)
 		glDisableClientState(GL_VERTEX_ARRAY);
 	}
 
-	if (in_game_mode) {
-	/* Draw action buttons */
+	/* Draw action buttons - always visible */
 	for (int i = 0; i < (int)NUM_BUTTONS; i++) {
 		float bx = touch_buttons[i].cx * sw;
 		float by = touch_buttons[i].cy * sh;
@@ -673,20 +725,8 @@ void touch_overlay_draw(int screen_w, int screen_h)
 		draw_filled_circle(bx, by, btn_r_px, CIRCLE_SEGMENTS, 0.8f, 0.8f, 0.8f, alpha);
 		draw_ring(bx, by, btn_r_px, CIRCLE_SEGMENTS, 1.0f, 1.0f, 1.0f, alpha + 0.1f);
 	}
-	} else {
-	/* Menu mode: draw OK, KB, UP, DN buttons */
-	float menu_r_px = MENU_BTN_RADIUS * sh;
-	for (int i = 0; i < (int)NUM_MENU_BUTTONS; i++) {
-		float bx = menu_buttons[i].cx * sw;
-		float by = menu_buttons[i].cy * sh;
-		float r_c = 0.3f, g_c = 0.8f, b_c = 0.3f;  /* green tint */
-		if (menu_buttons[i].zone == ZONE_MENU_KEYBOARD)
-			{ r_c = 0.3f; g_c = 0.5f; b_c = 1.0f; }  /* blue for keyboard */
-		draw_filled_circle(bx, by, menu_r_px, CIRCLE_SEGMENTS, r_c, g_c, b_c, 0.35f);
-		draw_ring(bx, by, menu_r_px, CIRCLE_SEGMENTS, r_c, g_c, b_c, 0.6f);
-	}
-	}
 
+restore_gl:
 	/* Restore GL state */
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
@@ -701,6 +741,10 @@ void touch_overlay_close(void)
 {
 	memset(fingers, 0, sizeof(fingers));
 	lstick_active = rstick_active = fire_active = 0;
+	if (gyro_sensor) {
+		SDL_SensorClose(gyro_sensor);
+		gyro_sensor = NULL;
+	}
 }
 
 #endif /* __ANDROID__ */

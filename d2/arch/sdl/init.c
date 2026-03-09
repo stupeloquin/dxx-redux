@@ -11,6 +11,9 @@
 #include "text.h"
 #include "args.h"
 #include "config.h"
+#ifdef __ANDROID__
+#include "touch.h"
+#endif
 
 void arch_close(void)
 {
@@ -30,6 +33,10 @@ void arch_close(void)
 	}
 
 	key_close();
+
+#ifdef __ANDROID__
+	touch_overlay_close();
+#endif
 
 	SDL_Quit();
 }
@@ -63,6 +70,10 @@ void arch_init(void)
 
 	if ((t = gr_init(0)) != 0)
 		Error(TXT_CANT_INIT_GFX,t);
+
+#ifdef __ANDROID__
+	touch_overlay_init();
+#endif
 
 	atexit(arch_close);
 }

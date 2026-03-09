@@ -1251,7 +1251,7 @@ int net_udp_list_join_poll( newmenu *menu, d_event *event, direct_join *dj )
 #ifdef IPv6
 			net_udp_request_game_info(GMcast_v6, 1);
 #endif
-#ifdef USE_TRACKER
+#if defined(USE_TRACKER) && !defined(__ANDROID__)
 			udp_tracker_reqgames();
 #endif
 			break;

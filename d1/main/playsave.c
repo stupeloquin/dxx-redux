@@ -140,6 +140,7 @@ int new_player_config()
 	PlayerCfg.DisableCockpit = 0;  /* DisableCockpit */ 
 	PlayerCfg.StickyRearview = 0; /* StickyRearview */
 	PlayerCfg.UseGyro = 0;
+	PlayerCfg.InvertTouchPitch = 0;
 	PlayerCfg.SelectAfterFire = 1;  /* SelectAfterFire */
 	PlayerCfg.VulcanAmmoWarnings = 1; 
 	PlayerCfg.ShieldWarnings = 0; 
@@ -464,6 +465,8 @@ int read_player_d1x(char *filename)
 					PlayerCfg.StickyRearview = atoi(line); /* StickyRearview */
 				if(!strcmp(word,"USEGYRO"))
 					PlayerCfg.UseGyro = atoi(line);
+				if(!strcmp(word,"INVERTTOUCHPITCH"))
+					PlayerCfg.InvertTouchPitch = atoi(line);
 				if(!strcmp(word,"SELECTAFTERFIRE"))
 					PlayerCfg.SelectAfterFire = atoi(line); /* SelectAfterFire */ 										
 				if(!strcmp(word,"NOFIREAUTOSELECT"))
@@ -943,6 +946,7 @@ int write_player_d1x(char *filename)
 		PHYSFSX_printf(fout,"disablecockpit=%i\n",PlayerCfg.DisableCockpit); /* DisableCockpit */ 
 		PHYSFSX_printf(fout,"stickyrearview=%i\n",PlayerCfg.StickyRearview); /* StickyRearview */
 		PHYSFSX_printf(fout,"usegyro=%i\n",PlayerCfg.UseGyro);
+		PHYSFSX_printf(fout,"inverttouchpitch=%i\n",PlayerCfg.InvertTouchPitch);
 		PHYSFSX_printf(fout,"selectafterfire=%i\n",PlayerCfg.SelectAfterFire); /* SelectAfterFire */ 		
 		PHYSFSX_printf(fout,"nofireautoselect=%i\n",PlayerCfg.NoFireAutoselect);
 		PHYSFSX_printf(fout,"cycleautoselectonly=%i\n",PlayerCfg.CycleAutoselectOnly);

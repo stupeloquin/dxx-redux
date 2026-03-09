@@ -1069,7 +1069,7 @@ void input_config_sensitivity()
 	PlayerCfg.MouseImpulse = m[mouseimpulse].value; /* Old School Mouse */ 
 }
 
-static int opt_ic_usejoy = 0, opt_ic_usemouse = 0, opt_ic_usegyro = -1, opt_ic_confkey = 0, opt_ic_confjoy = 0, opt_ic_confmouse = 0, opt_ic_confweap = 0, opt_ic_mouseflightsim = 0, opt_ic_joymousesens = 0, opt_ic_grabinput = 0, opt_ic_mousefsgauge = 0, opt_ic_stickyrear = 0, opt_ic_help0 = 0, opt_ic_help1 = 0, opt_ic_help2 = 0;
+static int opt_ic_usejoy = 0, opt_ic_usemouse = 0, opt_ic_usegyro = -1, opt_ic_inverttouch = -1, opt_ic_confkey = 0, opt_ic_confjoy = 0, opt_ic_confmouse = 0, opt_ic_confweap = 0, opt_ic_mouseflightsim = 0, opt_ic_joymousesens = 0, opt_ic_grabinput = 0, opt_ic_mousefsgauge = 0, opt_ic_stickyrear = 0, opt_ic_help0 = 0, opt_ic_help1 = 0, opt_ic_help2 = 0;
 int input_config_menuset(newmenu *menu, d_event *event, void *userdata)
 {
 	newmenu_item *items = newmenu_get_items(menu);
@@ -1086,6 +1086,8 @@ int input_config_menuset(newmenu *menu, d_event *event, void *userdata)
 				(items[citem].value)?(PlayerCfg.ControlType|=CONTROL_USING_MOUSE):(PlayerCfg.ControlType&=~CONTROL_USING_MOUSE);
 			if (opt_ic_usegyro >= 0 && citem == opt_ic_usegyro)
 				PlayerCfg.UseGyro = items[citem].value;
+			if (opt_ic_inverttouch >= 0 && citem == opt_ic_inverttouch)
+				PlayerCfg.InvertTouchPitch = items[citem].value;
 			/* Old School Mouse */
 			if (citem == opt_ic_mouseflightsim)
 				PlayerCfg.MouseControlStyle = MOUSE_CONTROL_REBIRTH;
@@ -1130,7 +1132,7 @@ int input_config_menuset(newmenu *menu, d_event *event, void *userdata)
 
 void input_config()
 {
-	newmenu_item m[24];
+	newmenu_item m[26];
 	int nitems = 0;
 
 	opt_ic_usejoy = nitems;
@@ -1140,8 +1142,11 @@ void input_config()
 #ifdef __ANDROID__
 	opt_ic_usegyro = nitems;
 	m[nitems].type = NM_TYPE_CHECK; m[nitems].text = "USE GYROSCOPE"; m[nitems].value = PlayerCfg.UseGyro; nitems++;
+	opt_ic_inverttouch = nitems;
+	m[nitems].type = NM_TYPE_CHECK; m[nitems].text = "INVERT TOUCH PITCH"; m[nitems].value = PlayerCfg.InvertTouchPitch; nitems++;
 #else
 	opt_ic_usegyro = -1;
+	opt_ic_inverttouch = -1;
 #endif
 	m[nitems].type = NM_TYPE_TEXT; m[nitems].text = ""; nitems++;
 	opt_ic_confkey = nitems;

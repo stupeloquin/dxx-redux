@@ -519,5 +519,8 @@ int main(int argc, char *argv[])
 	PHYSFSX_removeArchiveContent();
 	reset_observatory_stats();
 
+#ifdef __ANDROID__
+	exit(0);  /* Terminate the process; returning from SDL_main leaves the activity alive */
+#endif
 	return(0);		//presumably successful exit
 }

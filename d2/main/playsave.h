@@ -98,6 +98,7 @@ typedef struct player_config
 	ubyte DisableCockpit;  /* DisableCockpit */
 	ubyte StickyRearview; /* StickyRearview */
 	ubyte UseGyro;
+	ubyte InvertTouchPitch;
 	ubyte SelectAfterFire; /* SelectAfterFire */
 	int maxFps;
 	int ShipColor;

@@ -142,10 +142,6 @@ int event_init()
 	// We should now be active and responding to events.
 	initialised = 1;
 
-#ifdef __ANDROID__
-	touch_overlay_init();
-#endif
-
 	return 0;
 }
 
@@ -197,7 +193,7 @@ void event_process(void)
 #ifdef __ANDROID__
 	{
 		extern window *Game_wind;
-		touch_overlay_set_game_mode(Game_wind != NULL);
+		touch_overlay_set_game_mode(Game_wind != NULL && wind == Game_wind);
 	}
 #endif
 
